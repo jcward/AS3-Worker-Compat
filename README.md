@@ -1,7 +1,7 @@
 AS3-Worker-Compat
 =================
 
-ActionScript Worker wrapper for compatibility with all versions of the AS3
+ActionScript Worker wrapper for compatibility with all AS3 versions of the
 Flash Player (9 and later)
 
 What does it do?
