@@ -21,7 +21,7 @@ runtime-error of the flavor:
 Demo / Usage
 =================
 
-See the WorkerCompatTest.as example, and the compiled WorkerCompatTest.swf for
+See the WorkerCompatTest.as example, and the compiled <a href="http://lilcodemonkey.com/github/AS3-Worker-Compat/WorkerCompatTest.swf">WorkerCompatTest.swf</a> for
 the demo.  The demo shows a red "radar-like" graphic that is generative, while
 also running a CPU-burning while loop.  If AS3 Workers are supported, the two
 tasks are run on separate threads and the graphic is a smooth fading radar
@@ -29,4 +29,4 @@ tasks are run on separate threads and the graphic is a smooth fading radar
 AS3 Workers are not supported, both tasks are run on the same thread (AS3 is
 inherently single-threaded) and the radar graphic is choppy.
 
-See demo_output.png
+See <a href="http://github.com/jcward/AS3-Worker-Compat/blob/master/demo_output.png">demo_output.png</a>
