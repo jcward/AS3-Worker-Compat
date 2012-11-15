@@ -39,9 +39,11 @@ package
     // Constructor
     public function WorkerCompatTest():void
     {
-      stage.align = 'topLeft';
-      stage.scaleMode ='noScale';
-      stage.frameRate = 60;
+      if (stage) {
+        stage.align = 'topLeft';
+        stage.scaleMode ='noScale';
+        stage.frameRate = 60;
+      }
 
       // Get a reference to the cross-thread shared object
       xtSharedObject = new XTSharedObject();
@@ -70,9 +72,11 @@ package
       text = new TextField();
       text.width = text.height = 500;
       text.x = 105;
-      text.text = "Flash Player version: " + Capabilities.version+"\n"+
+      text.text = "WorkerCompatTest v0.2\n"+
+                  "Flash Player version: " + Capabilities.version+"\n"+
                   "userAgent: "+userAgent+"\n"+
-                  "WorkerClass: "+WorkerCompat.Worker+"\n"+
+                  "Worker Class (11.4+): "+WorkerCompat.Worker+"\n"+
+                  "Mutex Class (11.5+): "+WorkerCompat.Mutex+"\n"+
                   "workersSupported: " + WorkerCompat.workersSupported;
       addChild(text);
     }
@@ -83,7 +87,7 @@ package
         doGuiWork();
         // Creates a duplicate of this worker to run as the background worker
         var bgWorker:* = WorkerCompat.WorkerDomain.current.createWorker(this.loaderInfo.bytes);
-        xtSharedObject.attachWorker(bgWorker);
+        XTSharedObject.attachWorker(bgWorker);
         bgWorker.start();
       } else { // Background thread runs this
         doBackgroundWork();
@@ -104,22 +108,40 @@ package
 
     private function doBackgroundWork():void
     {
+      var tick:int = 0;
       xtSharedObject.tick = 0;
 
       // Every 400 ms, burn the CPU for 370 ms
       setInterval(function():void {
-        var t:Number = getTimer();
-        while (getTimer()-t < 370) {
-          xtSharedObject.tick++;
+        var t0:Number = getTimer();
+        var dt:int = 0;
+        while (dt < 370) {
+          tick++;
+
+          // If you set this every cycle, it can saturate the
+          // shared object and crash the flash player.  Let's
+          // send an update every 16 ms (roughly every frame)
+          if (dt % 16 == 0) {
+            xtSharedObject.tick = tick;
+          }
+
+          dt = getTimer()-t0;
         }
       }, 400);
+
+      // Every 16ms, update shared tick value
+      setInterval(function():void {
+      }, 16);
+
     }
 
     private function onFrame(e:Event):void
     {
       var t:Number = getTimer();
 
-      count.text = 'Background worker count = '+xtSharedObject.tick;
+      var tick:int = xtSharedObject.tick;
+      count.text = 'Background worker count = '+tick+
+        ', ~'+(Math.floor(10*(tick/getTimer()))/10)+' Kps';
 
       // Fade to black
       shape.graphics.clear();

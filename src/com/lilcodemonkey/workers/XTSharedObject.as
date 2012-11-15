@@ -12,10 +12,15 @@ package com.lilcodemonkey.workers {
    * Players that don't support Workers, this represents a simple static
    * Object.
    *
-   * There are 2 requirements to using this class:
+   * There are a few things to keep in mind when using this class:
    *
-   *  - An XTSharedObject must be created from the primordial worker
-   *    before the Oobject's properties are accessed.
+   *  - Each worker must be attached to the XTSharedObject class via:
+   *      XTSharedObject.attachWorker(worker);
+   *    before calling worker.start();
+   *
+   *  - A background worker could potentially saturate this shared object
+   *    by writing too often (i.e. in a loop) and it can crash Flash.  Plan
+   *    your write/update frequency accordingly.
    *
    *  - To ensure consistent behavior for all Flash Player versions, be
    *    careful to only get/set AMF serializable objects on this object.
@@ -23,12 +28,32 @@ package com.lilcodemonkey.workers {
    *    data types, and Objects and Arrays composed of simple data types
    *    are OK.  References to instances (Sprite, MyClass, etc), are
    *    typically NOT AMF serializable.
+   *
+   *  - Typically you should not use Objects and Arrays as properties,
+   *    because setting a property within those Objects does not trigger
+   *    the setter that writes the value to the other workers.  In other
+   *    words, a setter should only use one level of accessor:
+   *
+   *     xtso.value = 1;
+   *
+   *    And never sub-properties:
+   *
+   *     xtso.obj.value = 1; // This set won't get sent to other workers!
+   *
+   *    TODO: make this XTSO-class recursive?
    */
   dynamic public class XTSharedObject extends Proxy {
 
     private static var _primordial:*;
     private static var _cachedWorkersSupported:Boolean;
     private static var _cachedIsPrimordial:Boolean;
+
+    public static function attachWorker(worker:*):void
+    {
+      if (_cachedWorkersSupported && _cachedIsPrimordial) {
+        worker.setSharedProperty("_XTSOPrimordial", WorkerCompat.Worker.current);
+      }
+    }
 
     public function XTSharedObject():void
     {
@@ -40,62 +65,26 @@ package com.lilcodemonkey.workers {
           _primordial = WorkerCompat.Worker.current;
           trace("Setting _primordial with self");
         } else {
-          var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
-          for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
-            trace("Checking worker "+i);
-            if (!vectorOfWorkers[i].isPrimordial) {
-              trace("Setting _primordial with worker "+i);
-              _primordial = vectorOfWorkers[i];
-              //break;
-            }
-          }
-          //_primordial = WorkerCompat.Worker.current.getSharedProperty("_XTSOToPrimordial");
+          // This should work, but doesn't...  It finds the _primordial ref
+          // but communication via get/set doesn't work.
+          //var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
+          //for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
+          //  trace("Checking worker "+i);
+          //  if (!vectorOfWorkers[i].isPrimordial) {
+          //    trace("Setting _primordial with worker "+i);
+          //    _primordial = vectorOfWorkers[i];
+          //    //break;
+          //  }
+          //}
+
+          // Instead we must pass in a reference manually.  =P
+          _primordial = WorkerCompat.Worker.current.getSharedProperty("_XTSOPrimordial");
         }
         trace("_primordial is: "+_primordial);
       } else {
         if (_primordial==null) {
           _primordial = new Object();
         }
-      }
-
-//        if (_cachedWorkersSupported) {
-// 
-//          if (WorkerCompat.Worker.current.isPrimordial) {
-//            _workersvar vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers;
-//            _primordial = WorkerCompat.Worker.current;
-//          }
-// 
-//          // This doesn't work.  I'm not sure why the primordial worker isn't
-//          // returned in the listWorkers vector...
-//          var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers;
-//          for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
-//            if (!vectorOfWorkers[i].isPrimordial) {
-//              _primordial = vectorOfWorkers[i];
-//              break;
-//            }
-//          }
-//          //if (_primordial==null) {
-//          //  throw new Error("Error: primordial worker not found!");
-//          //}
-//        } else {
-//          _primordial = new Object();
-//        }
-//      }
-    }
-
-    //flash_proxy override function callProperty(name:*, ...args):*
-
-    public function attachWorker(worker:*):void
-    {
-      if (_cachedWorkersSupported && _cachedIsPrimordial) {
-        //var fromPrimordial:* = Worker.current.createMessageChannel(bgWorker);
-        //var toPrimordial:* = Worker.current.createMessageChannel(bgWorker);
-        worker.setSharedProperty("_XTSOToPrimordial", WorkerCompat.Worker.current);
-        // 
-        //if (!_sendChannels) { _sendChannels = []; }
-        //_sendChannels.push(fromPrimordial);
-        // 
-        //worker.setSharedProperty("_XTSharedObjectChannel", WorkerCompat.WorkerDomain.current);
       }
     }
 

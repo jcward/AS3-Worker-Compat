@@ -4,24 +4,70 @@ AS3-Worker-Compat
 ActionScript Worker wrapper for compatibility with all AS3 versions of the
 Flash Player (9 and later)
 
-What does it do?
-=================
+About
+=====
+
+What it does
+------------
 
 The WorkerCompat wrapper simply uses dynamic-lookup to determine if the Worker
 API is available and supported.  This allows SWFs compiled with this code to be
 playable on all version of the Flash Player, not just those with Worker support
 (11.4 and later).
 
+What it doesn't do
+------------------
+
+There's no magic - if your SWF is running in an environment without threading
+support, there will still be UI blocking and pseudo-threading.  You'll need
+to write your application with this in mind.  However, using this library
+just gives you the peace of mind that your code will run on all Flash Players
+(and even compile to AIR for mobile) without crashing, and it'll simply take
+advantage of Worker threads when they're available.
+
+Also, be aware when using dynamic/runtime class lookup, you don't get
+compile-time type checking on those classes (Worker, WorkerDomain, etc).
+However, when building the demos, I found that I didn't use those classes
+at all but to instantiate my worker.  After that, it's all application logic.
+
+Features
+========
+
+What's New in v0.2
+------------------
+
+The major new feature in v0.2 is XTSharedObject.  If your first concern is a
+SWF that plays in all Flash Players, your second concern is how to easily get
+your threads communicating together.
+
+XTSharedObject is a dead-simple Object that's shared between all threads,
+again, coded to work the same whether the Flash Player supports Workers or
+not.  There are usage requirements / gotchas at the top of the comments in
+XTSharedObject.as, and the WorkerCompatTest demo now uses it to pass a count
+value from the background worker to the foreground.
+
+While being incredibly easy to use, XTSharedObject is not the most performant
+way to share data between threads - if you're passing around large chunks of
+data you should use shared ByteArrays (available in FP 11.5+) - maybe I'll
+add such support later.
+
+What's New in v0.1
+------------------
+
+The initial release, v0.1 introduced the WorkerCompat wrapper.  It contains
+the dynamic class lookup calls which are the basis of detecting the Worker
+API regardless of Flash Player version.
+
 This wrapper is an alternative to using static imports, which would cause a
-runtime-error in Flash Player earlier than 11.4, something like:
+runtime-error in Flash Players earlier than 11.4, something like:
 
 <pre>
  An ActionScript error has occurred:
   ReferenceError: Error #1065: Variable flash.system::Worker is not defined.
 </pre>
 
-Demo / Usage
-=================
+Demo
+====
 
 See the WorkerCompatTest.as example, and the compiled <a href="http://lilcodemonkey.com/github/AS3-Worker-Compat/WorkerCompatTest.swf">WorkerCompatTest.swf</a> for
 the demo.  The demo shows a red "radar-like" graphic that is generated
@@ -39,10 +85,36 @@ If AS3 Workers are not supported, both tasks are run on the same thread
 <img src="http://lilcodemonkey.com/github/AS3-Worker-Compat/demo_output.png"/>
 
 Most importantly, the above demo SWF can be run on any Flash Player
-version 9 or above.  Be aware, with the flexibility of dynamic class
-lookup, you lose compile-time error checking.  I will investigate adding
-some options for easily switching between compile-time-checking and
-runtime-backward-compatibility.
+version 9 or above.
+
+Usage / Conversion
+==================
+
+If you're familiar with AS3 Workers, then using WorkerCompat is as simple as changing
+this code:
+
+<pre>
+  import flash.system.Worker;
+  import flash.system.WorkerDomain;
+
+  ...
+
+  if (Worker.isSupported && Worker.current.isPrimordial) {
+    var myWorker:Worker = WorkerDomain.current.createWorker(swfbytes);
+  }
+</pre>
+
+To this code:
+
+<pre>
+  import com.lilcodemonkey.WorkerCompat;
+
+  ...
+
+  if (WorkerCompat.workersSupported && WorkerCompat.Worker.current.isPrimordial) {
+    var myWorker:* = WorkerCompat.WorkerDomain.current.createWorker(swfbytes);
+  }
+</pre>
 
 License (FreeBSD)
 =================
