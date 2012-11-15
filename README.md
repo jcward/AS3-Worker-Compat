@@ -4,6 +4,8 @@ AS3-Worker-Compat
 ActionScript Worker wrapper for compatibility with all AS3 versions of the
 Flash Player (9 and later)
 
+<b>NEW:</b> v0.2 includes basic cross-thread data sharing support!
+
 About
 =====
 
@@ -15,23 +17,57 @@ API is available and supported.  This allows SWFs compiled with this code to be
 playable on all version of the Flash Player, not just those with Worker support
 (11.4 and later).
 
+Features
+========
+
+* v0.1
+  * WorkerCompat - backward-compatible Worker wrapper
+* v0.2
+  * XTSharedObject - dead-simple cross-thread data sharing
+
+See <a href="https://github.com/jcward/AS3-Worker-Compat/edit/master/README.md#feature-details">Feature Details</a> below for more info.
+
+Demo
+====
+
+The WorkerCompatTest demo shows a red "radar-like" graphic that is generated on-the-fly,
+while also running a CPU-burning while loop.  This demo SWF works in all Flash
+Player versions.
+
+<a href="http://lilcodemonkey.com/github/WorkerCompatTest_v0.2/WorkerCompatTest.swf">Try it now in your browser</a>.
+
+If AS3 Workers are supported, the two tasks are run on separate threads
+and the graphic is a smooth fading radar.
+
+If AS3 Workers are not supported, both tasks are run on the same thread
+(AS3 is inherently single-threaded) and the radar graphic is choppy -
+intentionally, for demonstrative purposes.  In a real-world application
+you'd attempt to balance your background logic to leave the UI as smooth
+as possible even without Workers.
+
+Here's a screenshot of the demo in two browsers, one supporting Workers and
+the other not.
+
+<img src="http://lilcodemonkey.com/github/AS3-Worker-Compat/demo_output.png"/>
+
+Feature Details
+===============
+
 What it doesn't do
 ------------------
 
-There's no magic - if your SWF is running in an environment without threading
+There's no magic - if your SWF is running in an environment without Worker
 support, there will still be UI blocking and pseudo-threading.  You'll need
-to write your application with this in mind.  However, using this library
-just gives you the peace of mind that your code will run on all Flash Players
-(and even compile to AIR for mobile) without crashing, and it'll simply take
-advantage of Worker threads when they're available.
+to write your application with this in mind to handle either case.  However,
+using this library you'll get the peace of mind that:
+ * your SWF will run on all Flash Players (and even compile to AIR for
+   mobile, which also doesn't support Workers), and
+ * it'll simply take advantage of Worker threads when they're available.
 
 Also, be aware when using dynamic/runtime class lookup, you don't get
 compile-time type checking on those classes (Worker, WorkerDomain, etc).
 However, when building the demos, I found that I didn't use those classes
 at all but to instantiate my worker.  After that, it's all application logic.
-
-Features
-========
 
 What's New in v0.2
 ------------------
@@ -65,27 +101,6 @@ runtime-error in Flash Players earlier than 11.4, something like:
  An ActionScript error has occurred:
   ReferenceError: Error #1065: Variable flash.system::Worker is not defined.
 </pre>
-
-Demo
-====
-
-See the WorkerCompatTest.as example, and the compiled <a href="http://lilcodemonkey.com/github/AS3-Worker-Compat/WorkerCompatTest.swf">WorkerCompatTest.swf</a> for
-the demo.  The demo shows a red "radar-like" graphic that is generated
-on-the-fly, while also running a CPU-burning while loop.
-
-If AS3 Workers are supported, the two tasks are run on separate threads
-and the graphic is a smooth fading radar (subject of course to processor
-performance and other system processes.)
-
-If AS3 Workers are not supported, both tasks are run on the same thread
-(AS3 is inherently single-threaded) and the radar graphic is choppy.
-
-<a href="http://github.com/jcward/AS3-Worker-Compat/blob/master/demo_output.png">demo_output.png</a> shows examples of both:
-
-<img src="http://lilcodemonkey.com/github/AS3-Worker-Compat/demo_output.png"/>
-
-Most importantly, the above demo SWF can be run on any Flash Player
-version 9 or above.
 
 Usage / Conversion
 ==================
