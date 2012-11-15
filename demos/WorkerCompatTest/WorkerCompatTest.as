@@ -1,4 +1,4 @@
-package com.lilcodemonkey.workers
+package
 {
 
   import flash.display.Bitmap;
@@ -11,6 +11,10 @@ package com.lilcodemonkey.workers
   import flash.text.TextField;
   import flash.utils.getTimer;
   import flash.utils.setInterval;
+  import flash.utils.setTimeout;
+
+  import com.lilcodemonkey.workers.WorkerCompat;
+  import com.lilcodemonkey.workers.XTSharedObject;
 
   /**
    * This test showcases the backward-compatible use of AS3 Workers.  It runs
@@ -20,19 +24,29 @@ package com.lilcodemonkey.workers
    * A notable exception is Google Chrome under Windows (PPAPI)... for some
    * reason Google has disabled workers in their bundled version of Flash 11.4
    *
-   * This simple demo does not demonstrate intra-thread communication.
+   * Very simple cross-thread data sharing (again, in any Flash Player) is
+   * achieved via getting/setting values on xtSharedObject.
    */
   public class WorkerCompatTest extends Sprite
   {
     private var shape:Shape;
     private var bitmap:Bitmap;
+    private var count:TextField;
+    public static var text:TextField;
+
+    private var xtSharedObject:Object;
 
     // Constructor
     public function WorkerCompatTest():void
     {
-      stage.align = 'topLeft';
-      stage.scaleMode ='noScale';
-      stage.frameRate = 60;
+      if (stage) {
+        stage.align = 'topLeft';
+        stage.scaleMode ='noScale';
+        stage.frameRate = 60;
+      }
+
+      // Get a reference to the cross-thread shared object
+      xtSharedObject = new XTSharedObject();
 
       showInfo();
 
@@ -55,27 +69,27 @@ package com.lilcodemonkey.workers
         userAgent = "unknown";
       }
 
-      var text:TextField = new TextField();
+      text = new TextField();
       text.width = text.height = 500;
       text.x = 105;
-      text.text = "Flash Player version: " + Capabilities.version+"\n"+
+      text.text = "WorkerCompatTest v0.2\n"+
+                  "Flash Player version: " + Capabilities.version+"\n"+
                   "userAgent: "+userAgent+"\n"+
-                  "WorkerClass: "+WorkerCompat.Worker+"\n"+
+                  "Worker Class (11.4+): "+WorkerCompat.Worker+"\n"+
+                  "Mutex Class (11.5+): "+WorkerCompat.Mutex+"\n"+
                   "workersSupported: " + WorkerCompat.workersSupported;
       addChild(text);
     }
 
     private function setupThreads():void
     {
-      if (WorkerCompat.Worker.current.isPrimordial) {
-        // Main thread runs this
+      if (WorkerCompat.Worker.current.isPrimordial) { // Main thread runs this
         doGuiWork();
-
-        // And creates a duplicate of itself to run as the background worker
+        // Creates a duplicate of this worker to run as the background worker
         var bgWorker:* = WorkerCompat.WorkerDomain.current.createWorker(this.loaderInfo.bytes);
+        XTSharedObject.attachWorker(bgWorker);
         bgWorker.start();
-      } else {
-        // Background thread runs this
+      } else { // Background thread runs this
         doBackgroundWork();
       }
     }
@@ -85,21 +99,49 @@ package com.lilcodemonkey.workers
       shape = new Shape();
       bitmap = new Bitmap(new BitmapData(100, 100, false, 0x0));
       addChild(bitmap);
+      count = new TextField();
+      count.width = 500;
+      count.y = 105;
+      addChild(count);
       this.addEventListener(Event.ENTER_FRAME, onFrame);
     }
 
     private function doBackgroundWork():void
     {
-      // Every 200 ms, burn the CPU for 170 ms
+      var tick:int = 0;
+      xtSharedObject.tick = 0;
+
+      // Every 400 ms, burn the CPU for 370 ms
       setInterval(function():void {
-        var t:Number = getTimer();
-        while (getTimer()-t < 170) { }
-      }, 200);
+        var t0:Number = getTimer();
+        var dt:int = 0;
+        while (dt < 370) {
+          tick++;
+
+          // If you set this every cycle, it can saturate the
+          // shared object and crash the flash player.  Let's
+          // send an update every 16 ms (roughly every frame)
+          if (dt % 16 == 0) {
+            xtSharedObject.tick = tick;
+          }
+
+          dt = getTimer()-t0;
+        }
+      }, 400);
+
+      // Every 16ms, update shared tick value
+      setInterval(function():void {
+      }, 16);
+
     }
 
     private function onFrame(e:Event):void
     {
       var t:Number = getTimer();
+
+      var tick:int = xtSharedObject.tick;
+      count.text = 'Background worker count = '+tick+
+        ', ~'+(Math.floor(10*(tick/getTimer()))/10)+' Kps';
 
       // Fade to black
       shape.graphics.clear();
@@ -114,8 +156,8 @@ package com.lilcodemonkey.workers
       shape.graphics.moveTo(50, 50);
       shape.graphics.lineTo(50+45*Math.cos(t/300), 50+45*Math.sin(t/300));
       bitmap.bitmapData.draw(shape);
+
+      
     }
-
   }
-
 }
