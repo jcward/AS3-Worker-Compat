@@ -3,14 +3,15 @@ package com.lilcodemonkey.workers {
   import flash.utils.getTimer;
   import flash.utils.setTimeout;
 
-  public class AsyncHelper {
+  public class AsyncScheduler {
 
     private static var pending_jobs:Vector.<AsyncJob>;
     private static var jobs:Vector.<AsyncJob>;
     private static var prioritySum:Number = 0;
 
-    private static var timeOfFullPass:Number;
-    private static var timeBetweenRuns:Number;
+    private static var msToGrind:Number = 150;
+    private static var msToRest:Number = 4;
+    private static var defaultRest:Boolean = true;
 
     public static function loop(context:Object,
                                 loopFunc:Function,
@@ -29,17 +30,20 @@ package com.lilcodemonkey.workers {
       }
     }
 
+    public static function tweakParams(timeToGrindInMs:int,
+                                       timeToRestInMs:int):void
+    {
+      msToGrind = timeToGrindInMs;
+      msToRest = timeToRestInMs;
+      defaultRest = false;
+    }
+
     private static function startScheduler():void
     {
-      trace("startScheduler!");
-      if (WorkerCompat.workersSupported &&
+      if (defaultRest && WorkerCompat.workersSupported &&
           !WorkerCompat.Worker.current.isPrimordial) {
-        // no need to waste time on background threads
-        timeBetweenRuns = 1;
-        timeOfFullPass = 150;
-      } else {
-        timeBetweenRuns = 10;
-        timeOfFullPass = 20;
+        // no need to waste time on resting background threads
+        msToRest = 1;
       }
       runScheduler();
     }
@@ -50,15 +54,16 @@ package com.lilcodemonkey.workers {
       for (var i:int=jobs.length-1; i>=0; --i) {
         var j:AsyncJob = jobs[i];
         var t0:uint = getTimer();
-        var duration:uint = (j.priority/prioritySum)*timeOfFullPass;
+        var duration:uint = (j.priority/prioritySum)*msToGrind;
 
         var complete:Boolean = j.loopFunc.call(j.context, t0+duration);
         if (complete) {
           jobs.splice(i, 1);
+          prioritySum -= j.priority
         }
       }
       if (jobs.length>0 || pending_jobs.length>0) {
-        setTimeout(runScheduler, timeBetweenRuns);
+        setTimeout(runScheduler, msToRest);
       }
     }
 

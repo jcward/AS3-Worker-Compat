@@ -35,7 +35,7 @@ package
   import flash.display.*;
   import flash.utils.*;
 
-  import com.lilcodemonkey.workers.AsyncHelper;
+  import com.lilcodemonkey.workers.AsyncScheduler;
 
   /**
    * Class that converts BitmapData into a valid JPEG
@@ -45,7 +45,7 @@ package
 
     /**
      * Create a JPEG image from the specified BitmapData asynchronously,
-     * utilizing the AsyncHelper.loop pseudo-threading helper class.
+     * utilizing the AsyncScheduler.loop pseudo-threading helper class.
      * Compare to the synchronous/blocking encode() below.
      *
      * @param image The BitmapData that will be converted into the JPEG format.
@@ -104,8 +104,8 @@ package
       //  - asynchronousLoop is a way to implement pseudo-threading;
       //    it dosen't care if it's executed on a background or
       //    primordial Worker
-      AsyncHelper.loop(this,
-                       function(timeout:int):Boolean
+      AsyncScheduler.loop(this,
+                          function(timeout:int):Boolean
       {
         // Encode 8x8 macroblocks
         for (; ypos<image.height; ypos+=8) {
@@ -137,7 +137,7 @@ package
         callback(byteout);
         byteout = null;
         return true;
-      }); // No more code after the AsyncHelper.loop function call
+      }); // No more code after the AsyncScheduler.loop function call
     }
 
     /**
