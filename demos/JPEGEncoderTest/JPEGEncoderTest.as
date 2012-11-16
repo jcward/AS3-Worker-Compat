@@ -72,7 +72,6 @@ package
           doGuiWork();
           // Creates a duplicate of this worker to run as the background worker
           var bgWorker:* = WorkerCompat.WorkerDomain.current.createWorker(this.loaderInfo.bytes);
-          XTSharedObject.attachWorker(bgWorker);
           bgWorker.start();
         } else { // Background thread runs this
           doBackgroundWork();

@@ -14,10 +14,6 @@ package com.lilcodemonkey.workers {
    *
    * There are a few things to keep in mind when using this class:
    *
-   *  - Each worker must be attached to the XTSharedObject class via:
-   *      XTSharedObject.attachWorker(worker);
-   *    before calling worker.start();
-   *
    *  - A background worker could potentially saturate this shared object
    *    by writing too often (i.e. in a loop) and it can crash Flash.  Plan
    *    your write/update frequency accordingly.
@@ -48,13 +44,6 @@ package com.lilcodemonkey.workers {
     private static var _cachedWorkersSupported:Boolean;
     private static var _cachedIsPrimordial:Boolean;
 
-    public static function attachWorker(worker:*):void
-    {
-      if (_cachedWorkersSupported && _cachedIsPrimordial) {
-        worker.setSharedProperty("_XTSOPrimordial", WorkerCompat.Worker.current);
-      }
-    }
-
     public function XTSharedObject():void
     {
       _cachedWorkersSupported = WorkerCompat.workersSupported;
@@ -64,18 +53,13 @@ package com.lilcodemonkey.workers {
         if (_cachedIsPrimordial) {
           _primordial = WorkerCompat.Worker.current;
         } else {
-          // This should work, but doesn't...  It finds the _primordial ref
-          // but communication via get/set doesn't work.
-          //var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
-          //for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
-          //  if (!vectorOfWorkers[i].isPrimordial) {
-          //    _primordial = vectorOfWorkers[i];
-          //    //break;
-          //  }
-          //}
-
-          // Instead we must pass in a reference manually.  =P
-          _primordial = WorkerCompat.Worker.current.getSharedProperty("_XTSOPrimordial");
+          var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
+          for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
+            if (vectorOfWorkers[i].isPrimordial) {
+              _primordial = vectorOfWorkers[i];
+              break;
+            }
+          }
         }
       } else {
         if (_primordial==null) {
