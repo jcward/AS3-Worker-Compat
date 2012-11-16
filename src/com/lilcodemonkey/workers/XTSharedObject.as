@@ -71,7 +71,11 @@ package com.lilcodemonkey.workers {
     override flash_proxy function getProperty(name:*):*
     {
       if (_cachedWorkersSupported) {
-        return _primordial.getSharedProperty(name);
+        try {
+          return _primordial.getSharedProperty(name);
+        } catch (e:Error) {
+          return null;
+        }
       } else {
         return _primordial[name];
       }

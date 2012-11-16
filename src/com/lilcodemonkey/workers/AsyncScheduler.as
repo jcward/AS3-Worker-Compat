@@ -5,47 +5,48 @@ package com.lilcodemonkey.workers {
 
   public class AsyncScheduler {
 
+    private static var initialized:Boolean = false;
     private static var pending_jobs:Vector.<AsyncJob>;
     private static var jobs:Vector.<AsyncJob>;
     private static var prioritySum:Number = 0;
 
-    private static var msToGrind:Number = 150;
-    private static var msToRest:Number = 4;
-    private static var defaultRest:Boolean = true;
+    private static var msToGrind:uint = 150;
+    private static var msToRest:uint = 4;
+    private static var forceWorkerRest:Boolean = false;
+    private static var isBackgroundWorker:Boolean;
 
     public static function loop(context:Object,
                                 loopFunc:Function,
                                 priority:Number=1):void
     {
-      if (jobs==null) {
-        jobs = new Vector.<AsyncJob>();
-        pending_jobs = new Vector.<AsyncJob>();
-      }
+      if (!initialized) { init(); }
 
       if (priority<1) { priority = 1; }
       pending_jobs.push(new AsyncJob(priority, loopFunc, context));
 
       if (pending_jobs.length==1 && jobs.length==0) {
-        startScheduler();
+        runScheduler();
       }
     }
 
-    public static function tweakParams(timeToGrindInMs:int,
-                                       timeToRestInMs:int):void
+    private static function init():void
     {
+      initialized = true;
+      jobs = new Vector.<AsyncJob>();
+      pending_jobs = new Vector.<AsyncJob>();
+      isBackgroundWorker = WorkerCompat.workersSupported &&
+        !WorkerCompat.Worker.current.isPrimordial;
+    }
+
+    public static function setParams(timeToGrindInMs:uint,
+                                     timeToRestInMs:uint=0,
+                                     forceWorkerRest:Boolean=false):void
+    {
+      if (!initialized) { init(); }
+
       msToGrind = timeToGrindInMs;
-      msToRest = timeToRestInMs;
-      defaultRest = false;
-    }
-
-    private static function startScheduler():void
-    {
-      if (defaultRest && WorkerCompat.workersSupported &&
-          !WorkerCompat.Worker.current.isPrimordial) {
-        // no need to waste time on resting background threads
-        msToRest = 1;
-      }
-      runScheduler();
+      msToRest = timeToRestInMs
+      forceWorkerRest = forceWorkerRest;
     }
 
     private static function runScheduler():void
@@ -54,7 +55,9 @@ package com.lilcodemonkey.workers {
       for (var i:int=jobs.length-1; i>=0; --i) {
         var j:AsyncJob = jobs[i];
         var t0:uint = getTimer();
-        var duration:uint = (j.priority/prioritySum)*msToGrind;
+
+        // Duration is a percentage of time to grind
+        var duration:uint = (j.priority*msToGrind)/prioritySum;
 
         var complete:Boolean = j.loopFunc.call(j.context, t0+duration);
         if (complete) {
@@ -63,7 +66,7 @@ package com.lilcodemonkey.workers {
         }
       }
       if (jobs.length>0 || pending_jobs.length>0) {
-        setTimeout(runScheduler, msToRest);
+        setTimeout(runScheduler, (!isBackgroundWorker || forceWorkerRest) ? msToRest : 1);
       }
     }
 
