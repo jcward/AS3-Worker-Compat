@@ -50,13 +50,15 @@ package
      *
      * @param image The BitmapData that will be converted into the JPEG format.
      * @param callback A function called with the JPEG ByteArray on completion.
+     * @param outputByteArray Optional ByteArray for the output data.
      * @return void
      * @langversion ActionScript 3.0
      * @playerversion Flash 9.0
      * @tiptext
      */
     public function encode_async(image:BitmapData,
-                                 callback:Function):void
+                                 callback:Function,
+                                 outputByteArray:ByteArray=null):void
     {
       // Each JPEGEncoder instance can only handle 1 encoding job at a time
       if (byteout) {
@@ -64,7 +66,9 @@ package
       }
 
       // Initialize bit writer
-      byteout = new ByteArray();
+      byteout = outputByteArray ? outputByteArray : new ByteArray();
+      byteout.position=0;
+      byteout.length=0;
       bytenew=0;
       bytepos=7;
 
@@ -109,20 +113,17 @@ package
       {
         // Encode 8x8 macroblocks
         for (; ypos<image.height; ypos+=8) {
+          if (getTimer()>timeout) { return false; }
           for (; xpos<image.width; xpos+=8) {
+            if (getTimer()>timeout) { return false; }
+
             RGB2YUV(image, xpos, ypos);
             DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
             DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
             DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
-
-            // We can exit cleanly now and re-enter the loop later
-            if (getTimer()>timeout) return false;
           }
           // since the inner loop doesn't re-initialize, do it now
           xpos = 0;
-
-          // We can exit cleanly now and re-enter the loop later
-          if (getTimer()>timeout) return false;
         }
 
         // Do the bit alignment of the EOI marker
@@ -136,6 +137,7 @@ package
         writeWord(0xFFD9); //EOI
         callback(byteout);
         byteout = null;
+
         return true;
       }); // No more code after the AsyncScheduler.loop function call
     }
