@@ -63,15 +63,12 @@ package com.lilcodemonkey.workers {
         _cachedIsPrimordial = WorkerCompat.Worker.current.isPrimordial as Boolean;
         if (_cachedIsPrimordial) {
           _primordial = WorkerCompat.Worker.current;
-          trace("Setting _primordial with self");
         } else {
           // This should work, but doesn't...  It finds the _primordial ref
           // but communication via get/set doesn't work.
           //var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
           //for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
-          //  trace("Checking worker "+i);
           //  if (!vectorOfWorkers[i].isPrimordial) {
-          //    trace("Setting _primordial with worker "+i);
           //    _primordial = vectorOfWorkers[i];
           //    //break;
           //  }
@@ -80,7 +77,6 @@ package com.lilcodemonkey.workers {
           // Instead we must pass in a reference manually.  =P
           _primordial = WorkerCompat.Worker.current.getSharedProperty("_XTSOPrimordial");
         }
-        trace("_primordial is: "+_primordial);
       } else {
         if (_primordial==null) {
           _primordial = new Object();

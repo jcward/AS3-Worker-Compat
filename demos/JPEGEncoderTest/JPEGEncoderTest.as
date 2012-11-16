@@ -6,12 +6,11 @@ package
   import flash.display.Shape;
   import flash.display.Sprite;
   import flash.events.Event;
-  import flash.external.ExternalInterface;
   import flash.system.Capabilities;
   import flash.text.TextField;
   import flash.utils.getTimer;
-  import flash.utils.setInterval;
   import flash.utils.setTimeout;
+  import flash.utils.ByteArray;
 
   import com.lilcodemonkey.workers.WorkerCompat;
   import com.lilcodemonkey.workers.XTSharedObject;
@@ -27,19 +26,36 @@ package
    * Very simple cross-thread data sharing (again, in any Flash Player) is
    * achieved via getting/setting values on xtSharedObject.
    */
-  public class WorkerCompatTest extends Sprite
+  public class JPEGEncoderTest extends Sprite
   {
     private var shape:Shape;
     private var bitmap:Bitmap;
-    private var count:TextField;
+    private var text:TextField;
+    private var log:Array;
+
+    private var imageData:ByteArray;
+    //private var lastJPEG:DisplayObject;
 
     private var xtSharedObject:Object;
 
     // Constructor
-    public function WorkerCompatTest():void
+    public function JPEGEncoderTest():void
     {
       // Get a reference to the cross-thread shared object
       xtSharedObject = new XTSharedObject();
+      
+      // WorkerCompat.setShareable(imageData);
+      //  
+      // if (!WorkerCompat.workersSupported ||
+      //     WorkerCompat.Worker.current.isPrimordial) {
+      //   imageData = new ByteArray();
+      //   xtSharedObject.imageData = imageData;
+      // } else {
+      //   // Background worker, get ByteArray reference
+      //   imageData = xtSharedObject.imageData;
+      // }
+
+      trace("Entered JPEGEncoderTest...");
 
       if (WorkerCompat.workersSupported) {
         // Setup threading
@@ -61,23 +77,25 @@ package
 
     private function showInfo():void
     {
-      var userAgent:String;
-      try {
-        userAgent = ExternalInterface.call("(function() { return window.navigator.userAgent })");
-      } catch (e:Error) {
-        userAgent = "unknown";
-      }
-
-      var text:TextField = new TextField();
+      text = new TextField();
       text.width = text.height = 500;
       text.x = 105;
-      text.text = "WorkerCompatTest v0.2.1\n"+
-                  "Flash Player version: " + Capabilities.version+"\n"+
-                  "userAgent: "+userAgent+"\n"+
-                  "Worker Class (11.4+): "+WorkerCompat.Worker+"\n"+
-                  "Mutex Class (11.5+): "+WorkerCompat.Mutex+"\n"+
-                  "workersSupported: " + WorkerCompat.workersSupported;
+      var s:String = 
+        "JPEGEncoderTest, AS3-Worker-Compat v0.2.1\n"+
+        "Flash Player version: " + Capabilities.version+
+        ", workersSupported: "+WorkerCompat.workersSupported+
+        ", shareableByteArray support: "+(WorkerCompat.Mutex!=null)+"\n"+
+        "-------------------------------------------------------------------------------------\n";
+      log = s.split("\n");
+      text.text = s
       addChild(text);
+    }
+
+    private function appendLog(msg:String):void
+    {
+      log.push(msg);
+      if (log.length>10) log.splice(3, 1);
+      text.text = log.join("\n");
     }
 
     private function doGuiWork():void
@@ -90,44 +108,40 @@ package
       shape = new Shape();
       bitmap = new Bitmap(new BitmapData(100, 100, false, 0x0));
       addChild(bitmap);
-      count = new TextField();
-      count.width = 500;
-      count.y = 105;
-      addChild(count);
       this.addEventListener(Event.ENTER_FRAME, onFrame);
     }
 
     private function doBackgroundWork():void
     {
-      var tick:int = 0;
-      xtSharedObject.tick = 0;
+      // Generate BMP
+      var s:Shape = new Shape();
+      for (var i:int=0; i<1000; i++) {
+        s.graphics.lineStyle(Math.random()*5, Math.random()*0xffffff);
+        s.graphics.moveTo(Math.random()*512, Math.random()*512);
+        s.graphics.curveTo(Math.random()*512, Math.random()*512,
+                           Math.random()*512, Math.random()*512);
+      }
+      var canvas:BitmapData = new BitmapData(512, 512, false, 0x0);
+      canvas.draw(s);
 
-      // Every 400 ms, burn the CPU for 370 ms
-      setInterval(function():void {
-        var t0:Number = getTimer();
-        var dt:int = 0;
-        while (dt < 370) {
-          tick++;
-
-          // If you set this every cycle, it can saturate the
-          // shared object and crash the flash player.  Let's
-          // send an update every 16 ms (roughly every frame)
-          if (dt % 16 == 0) {
-            xtSharedObject.tick = tick;
-          }
-
-          dt = getTimer()-t0;
-        }
-      }, 400);
+      // Encode as JPEG
+      var t0:uint = getTimer();
+      var j:JPEGEncoder = new JPEGEncoder();
+      j.encode_async(canvas, function(ba:ByteArray):void {
+        xtSharedObject.msg = "JPEG Generated: 512x512, "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
+        doBackgroundWork(); // more JPEGs!
+      });
+      // Pass to Main thread for display
     }
 
     private function onFrame(e:Event):void
     {
       var t:Number = getTimer();
 
-      var tick:int = xtSharedObject.tick;
-      count.text = 'Background worker count = '+tick+
-        ', ~'+(Math.floor(10*(tick/t))/10)+' Kps';
+      if (xtSharedObject.msg) {
+        appendLog(xtSharedObject.msg);
+        xtSharedObject.msg = null;
+      }
 
       // Fade to black
       shape.graphics.clear();

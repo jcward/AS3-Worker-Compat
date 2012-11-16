@@ -29,11 +29,13 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package com.adobe.images
+package
 {
   import flash.geom.*;
   import flash.display.*;
   import flash.utils.*;
+
+  import com.lilcodemonkey.workers.AsyncHelper;
 
   /**
    * Class that converts BitmapData into a valid JPEG
@@ -42,16 +44,19 @@ package com.adobe.images
   {
 
     /**
-     * Created a JPEG image from the specified BitmapData
+     * Create a JPEG image from the specified BitmapData asynchronously,
+     * utilizing the AsyncHelper.loop pseudo-threading helper class.
+     * Compare to the synchronous/blocking encode() below.
      *
      * @param image The BitmapData that will be converted into the JPEG format.
-     * @return a ByteArray representing the JPEG encoded image data.
+     * @param callback A function called with the JPEG ByteArray on completion.
+     * @return void
      * @langversion ActionScript 3.0
      * @playerversion Flash 9.0
      * @tiptext
      */
     public function encode_async(image:BitmapData,
-                                 callback:Function):ByteArray
+                                 callback:Function):void
     {
       // Each JPEGEncoder instance can only handle 1 encoding job at a time
       if (byteout) {
@@ -80,8 +85,8 @@ package com.adobe.images
 
       // Loop state variables initialized OUTSIDE the loop
       //  Hence the for (; ... syntax - no initialization
-      var xPos:int = 0;
-      var yPos:int = 0;
+      var xpos:int = 0;
+      var ypos:int = 0;
 
       // Be aware that, in an asynchronousLoop:
       //  - time can pass in-between iterations, and hence
@@ -89,45 +94,101 @@ package com.adobe.images
       //  - the iteration function will always be invoked from the
       //    top, hence initialization code must live outside
       //    the loop, or you will loop infinitely:  i.e. use for(;
-      //  - the loop must exit if returnFunc()==true, leaving
-      //    its state variables valid for picking up in the next
-      //    loop iteration
+      //  - the loop must exit if:
+      //    -  getTimer()>timeout, returning false, and leaving
+      //       its state variables valid for picking up in the next
+      //       loop iteration
+      //    - it finishes, returning true to indicate it is completed
       //  - nothing involved in the loop logic should be called
       //    after asynchronousLoop()
       //  - asynchronousLoop is a way to implement pseudo-threading;
       //    it dosen't care if it's executed on a background or
       //    primordial Worker
       AsyncHelper.loop(this,
-        function(returnFunc):void {
-
-          // Encode 8x8 macroblocks
-          for (; ypos<image.height; ypos+=8) {
-            for (; xpos<image.width; xpos+=8) {
-              RGB2YUV(image, xpos, ypos);
-              DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
-              DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
-              DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
-            }
-            // since the inner loop doesn't re-initialize, do it now
-            xpos = 0;
+                       function(timeout:int):Boolean
+      {
+        // Encode 8x8 macroblocks
+        for (; ypos<image.height; ypos+=8) {
+          for (; xpos<image.width; xpos+=8) {
+            RGB2YUV(image, xpos, ypos);
+            DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
+            DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
+            DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
 
             // We can exit cleanly now and re-enter the loop later
-            if (returnFunc()) return;
+            if (getTimer()>timeout) return false;
           }
+          // since the inner loop doesn't re-initialize, do it now
+          xpos = 0;
 
-          // Do the bit alignment of the EOI marker
-          if ( bytepos >= 0 ) {
-            var fillbits:BitString = new BitString();
-            fillbits.len = bytepos+1;
-            fillbits.val = (1<<(bytepos+1))-1;
-            writeBits(fillbits);
-          }
-     
-          writeWord(0xFFD9); //EOI
-          callback(byteout);
-          byteout = null;
+          // We can exit cleanly now and re-enter the loop later
+          if (getTimer()>timeout) return false;
         }
-      ); // No more code after the AsyncHelper.loop function call
+
+        // Do the bit alignment of the EOI marker
+        if ( bytepos >= 0 ) {
+          var fillbits:BitString = new BitString();
+          fillbits.len = bytepos+1;
+          fillbits.val = (1<<(bytepos+1))-1;
+          writeBits(fillbits);
+        }
+
+        writeWord(0xFFD9); //EOI
+        callback(byteout);
+        byteout = null;
+        return true;
+      }); // No more code after the AsyncHelper.loop function call
+    }
+
+    /**
+     * Created a JPEG image from the specified BitmapData
+     *
+     * @param image The BitmapData that will be converted into the JPEG format.
+     * @return a ByteArray representing the JPEG encoded image data.
+     * @langversion ActionScript 3.0
+     * @playerversion Flash 9.0
+     * @tiptext
+     */
+    public function encode(image:BitmapData):ByteArray
+    {
+      // Initialize bit writer
+      byteout = new ByteArray();
+      bytenew=0;
+      bytepos=7;
+
+      // Add JPEG headers
+      writeWord(0xFFD8); // SOI
+      writeAPP0();
+      writeDQT();
+      writeSOF0(image.width,image.height);
+      writeDHT();
+      writeSOS();
+
+      // Encode 8x8 macroblocks
+      var DCY:Number=0;
+      var DCU:Number=0;
+      var DCV:Number=0;
+      bytenew=0;
+      bytepos=7;
+      for (var ypos:int=0; ypos<image.height; ypos+=8) {
+        for (var xpos:int=0; xpos<image.width; xpos+=8) {
+          RGB2YUV(image, xpos, ypos);
+          DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
+          DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
+          DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
+        }
+      }
+
+      // Do the bit alignment of the EOI marker
+      if ( bytepos >= 0 ) {
+        var fillbits:BitString = new BitString();
+        fillbits.len = bytepos+1;
+        fillbits.val = (1<<(bytepos+1))-1;
+        writeBits(fillbits);
+      }
+
+      writeWord(0xFFD9); //EOI
+      return byteout;
     }
 
     // Static table initialization
@@ -681,4 +742,42 @@ package com.adobe.images
       initQuantTables(sf);
     }
   }
+}
+
+
+/*
+  Copyright (c) 2008, Adobe Systems Incorporated
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without 
+  modification, are permitted provided that the following conditions are
+  met:
+
+  * Redistributions of source code must retain the above copyright notice, 
+    this list of conditions and the following disclaimer.
+  
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the 
+    documentation and/or other materials provided with the distribution.
+  
+  * Neither the name of Adobe Systems Incorporated nor the names of its 
+    contributors may be used to endorse or promote products derived from 
+    this software without specific prior written permission.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR 
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+class BitString
+{
+        public var len:int = 0;
+        public var val:int = 0;
 }
