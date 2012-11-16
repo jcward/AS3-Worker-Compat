@@ -174,7 +174,7 @@ package
       // Test asynchronous encoding with moderate AsyncScheduler parameters
       //  - will stutter the UI slightly if Workers are not supported
       //  - if workers are supported, this shouldn't affect performance at all
-      AsyncScheduler.setParams(150, 8);
+      AsyncScheduler.setParams(150, 15);
       var t0:uint = getTimer();
       var j:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
 
@@ -183,35 +183,22 @@ package
         xtSharedObject.imageData = ba;
         xtSharedObject.imageDataValid = true;
 
-        // Test asynchronous encoding with more lax AsyncScheduler profile
-        //  - will stutter the UI less if Workers are not supported, but
-        //    is least performant
-        //  - if workers are supported, this shouldn't affect performance much
-        AsyncScheduler.setParams(80, 20);
-        canvas = getRandomBitmapData();
-        var t1:uint = getTimer();
-        j = new JPEGEncoder(JPEG_QUALITY);
-        j.encode_async(canvas, function(ba:ByteArray):void {
-          xtSharedObject.msg = "BKG: JPEG generated asynchronously using JPEGEncoder, relaxed: "+ba.length+" bytes in "+(getTimer()-t1)+" ms";
-          xtSharedObject.imageData2 = ba;
-          xtSharedObject.imageData2Valid = true;
-
-          setTimeout(asynchronousEncodingTest, 10);
-        }, xtSharedObject.imageData2);
+        setTimeout(asynchronousEncodingTest, 10);
       }, xtSharedObject.imageData);
     }
 
-    private function getRandomBitmapData(size:int=512):BitmapData
+    private function getRandomBitmapData(width:int=1024,
+                                         height:int=512):BitmapData
     {
       // Generate BMP
       var s:Shape = new Shape();
       for (var i:int=0; i<1000; i++) {
         s.graphics.lineStyle(Math.random()*5, Math.random()*0xffffff);
-        s.graphics.moveTo(Math.random()*size, Math.random()*size);
-        s.graphics.curveTo(Math.random()*size, Math.random()*size,
-                           Math.random()*size, Math.random()*size);
+        s.graphics.moveTo(Math.random()*width, Math.random()*height);
+        s.graphics.curveTo(Math.random()*width, Math.random()*height,
+                           Math.random()*width, Math.random()*height);
       }
-      var canvas:BitmapData = new BitmapData(size, size, false, Math.random()*0xffffff);
+      var canvas:BitmapData = new BitmapData(width, height, false, Math.random()*0xffffff);
       canvas.draw(s);
 
       return canvas;
