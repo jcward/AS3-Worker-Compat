@@ -34,7 +34,7 @@ The WorkerCompatTest demo shows a red "radar-like" graphic that is generated on-
 while also running a CPU-burning while loop.  This demo SWF works in all Flash
 Player versions.
 
-<a href="http://lilcodemonkey.com/github/WorkerCompatTest_v0.2/WorkerCompatTest.swf">Try it now in your browser</a>.
+<a href="http://jcward.com/github/WorkerCompatTest_v0.2/WorkerCompatTest.swf">Try it now in your browser</a>.
 
 If AS3 Workers are supported, the two tasks are run on separate threads
 and the graphic is a smooth fading radar.
@@ -48,7 +48,7 @@ as possible even without Workers.
 Here's a screenshot of the demo in two browsers, one supporting Workers and
 the other not.
 
-<img src="http://lilcodemonkey.com/github/AS3-Worker-Compat/demo_output.png"/>
+<img src="http://jcward.com/github/AS3-Worker-Compat/demo_output.png"/>
 
 Feature Details
 ===============
@@ -122,7 +122,7 @@ this code:
 To this code:
 
 <pre>
-  import com.lilcodemonkey.WorkerCompat;
+  import com.jcward.WorkerCompat;
 
   ...
 

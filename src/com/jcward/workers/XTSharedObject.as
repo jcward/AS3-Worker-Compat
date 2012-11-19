@@ -1,4 +1,4 @@
-package com.lilcodemonkey.workers {
+package com.jcward.workers {
 
   import flash.utils.Proxy;
   import flash.utils.flash_proxy;

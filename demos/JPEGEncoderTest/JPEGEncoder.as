@@ -35,7 +35,7 @@ package
   import flash.display.*;
   import flash.utils.*;
 
-  import com.lilcodemonkey.workers.AsyncScheduler;
+  import com.jcward.workers.AsyncScheduler;
 
   /**
    * Class that converts BitmapData into a valid JPEG

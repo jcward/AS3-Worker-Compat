@@ -14,9 +14,9 @@ package
   import flash.utils.ByteArray;
   import flash.utils.getDefinitionByName;
 
-  import com.lilcodemonkey.workers.WorkerCompat;
-  import com.lilcodemonkey.workers.XTSharedObject;
-  import com.lilcodemonkey.workers.AsyncScheduler;
+  import com.jcward.workers.WorkerCompat;
+  import com.jcward.workers.XTSharedObject;
+  import com.jcward.workers.AsyncScheduler;
 
   /**
    * This test uses the AS3-Worker-Compat library to encode JPEGs in an

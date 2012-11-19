@@ -13,8 +13,8 @@ package
   import flash.utils.setInterval;
   import flash.utils.setTimeout;
 
-  import com.lilcodemonkey.workers.WorkerCompat;
-  import com.lilcodemonkey.workers.XTSharedObject;
+  import com.jcward.workers.WorkerCompat;
+  import com.jcward.workers.XTSharedObject;
 
   /**
    * This test showcases the backward-compatible use of AS3 Workers.  It runs

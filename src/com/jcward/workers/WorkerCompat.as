@@ -1,4 +1,4 @@
-package com.lilcodemonkey.workers {
+package com.jcward.workers {
 
   import flash.utils.getDefinitionByName;
   import flash.utils.ByteArray;
@@ -34,7 +34,7 @@ package com.lilcodemonkey.workers {
    *
    * Instead do this:
    *
-   *   import com.lilcodemonkey.WorkerCompat;
+   *   import com.jcward.WorkerCompat;
    *
    *   if (WorkerCompat.workersSupported && WorkerCompat.Worker.current.isPrimordial) {
    *     var myWorker:* = WorkerCompat.WorkerDomain.current.createWorker(swfbytes);
