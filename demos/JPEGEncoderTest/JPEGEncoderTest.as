@@ -3,6 +3,7 @@ package
 
   import flash.display.Bitmap;
   import flash.display.BitmapData;
+  import flash.display.DisplayObject;
   import flash.display.Loader;
   import flash.display.Shape;
   import flash.display.Sprite;
@@ -12,6 +13,7 @@ package
   import flash.utils.getTimer;
   import flash.utils.setTimeout;
   import flash.utils.ByteArray;
+  import flash.utils.Dictionary;
   import flash.utils.getDefinitionByName;
 
   import com.jcward.workers.WorkerCompat;
@@ -50,9 +52,10 @@ package
     private var text:TextField;
     private var log:Array;
     private var header:String;
+    private var tLast:Number;
 
-    private var lastJPEG:Loader;
-    private var tgt:Object;
+    private var container:Sprite;
+    private var tweenData:Dictionary;
 
     private var xtSharedObject:Object;
 
@@ -119,6 +122,8 @@ package
       stage.frameRate = 60;
       showInfo();
 
+      tweenData = new Dictionary();
+
       // Setup shareable bytearray fpr image data
       var imageData:ByteArray = new ByteArray();
       //WorkerCompat.setShareable(imageData);
@@ -129,12 +134,8 @@ package
       bitmap = new Bitmap(new BitmapData(100, 100, false, 0x0));
       addChild(bitmap);
 
-      // Setup JPEG loaders
-      lastJPEG = new Loader();
-      lastJPEG.y = 200;
-      addChild(lastJPEG);
-
-      tgt = { dx:0, dy:0, drotation:0, dscale:1 };
+      container = new Sprite();
+      addChild(container);
 
       this.addEventListener(Event.ENTER_FRAME, onFrame);
     }
@@ -169,21 +170,21 @@ package
 
     private function asynchronousEncodingTest():void
     {
-      var canvas:BitmapData = getRandomBitmapData();
+      var canvas:BitmapData = getRandomBitmapData(256, 256);
 
       // Test asynchronous encoding with moderate AsyncScheduler parameters
-      //  - will stutter the UI slightly if Workers are not supported
+      //  - if workers are not supported, this will stutter the UI somewhat
       //  - if workers are supported, this shouldn't affect performance at all
       AsyncScheduler.setParams(150, 15);
       var t0:uint = getTimer();
       var j:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
 
       j.encode_async(canvas, function(ba:ByteArray):void {
-        xtSharedObject.msg = "BKG: JPEG generated asynchronously using JPEGEncoder, intensive: "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
+        xtSharedObject.msg = "BKG: JPEG generated asynchronously using JPEGEncoder: "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
         xtSharedObject.imageData = ba;
         xtSharedObject.imageDataValid = true;
 
-        setTimeout(asynchronousEncodingTest, 10);
+        setTimeout(asynchronousEncodingTest, 20);
       }, xtSharedObject.imageData);
     }
 
@@ -207,6 +208,8 @@ package
     private function onFrame(e:Event):void
     {
       var t:Number = getTimer();
+      var dt:Number = t - tLast;
+      tLast = getTimer();
 
       // Receieve new messages
       var m:String = xtSharedObject.msg;
@@ -215,34 +218,23 @@ package
         xtSharedObject.msg = null;
       }
 
-      // Apply smoothing
-      if (xtSharedObject.smooth && lastJPEG.content) {
-        Bitmap(lastJPEG.content).smoothing = true;
-        xtSharedObject.smooth = false;
-      }
-
-      // Receieve new JPEGs
-      var imageData:ByteArray;
-      var ba:ByteArray;
-
-      imageData = xtSharedObject.imageData;
+      // Receieve new JPEG
+      var imageData:ByteArray = xtSharedObject.imageData;
       if (xtSharedObject.imageDataValid) {
         // If we don't clone, the image can change as it's overwritten
-        lastJPEG.loadBytes(cloneByteArray(imageData));
+        spawnJPEGChild(cloneByteArray(imageData));
         xtSharedObject.imageDataValid = false;
-        xtSharedObject.smooth = true;
-        tgt = { dx:Math.random()*2-1, dy:Math.random()*2-1, drotation:Math.random()*1-0.5, dscale:1+Math.random()*0.004-0.003 };
-        lastJPEG.x = 0;
-        lastJPEG.y = 200;
-        lastJPEG.rotation = 0;
-        lastJPEG.scaleX = lastJPEG.scaleY = 1;
       }
 
       // Animate JPEGs
-      lastJPEG.x += tgt.dx;
-      lastJPEG.y += tgt.dy;
-      lastJPEG.rotation += tgt.drotation;
-      lastJPEG.scaleY = lastJPEG.scaleX *= tgt.dscale;
+      for (var i:int=container.numChildren-1; i>=0; i--) {
+        var loader:DisplayObject = container.getChildAt(i);
+        var tgt:Object = tweenData[loader];
+        loader.x += dt*tgt.dx;
+        loader.y += dt*tgt.dy;
+        loader.rotation += dt*tgt.drotation;
+        //loader.scaleY = loader.scaleX *= tgt.dscale;
+      }
 
       // Animate spinner
       shape.graphics.clear();
@@ -255,6 +247,21 @@ package
       shape.graphics.moveTo(50, 50);
       shape.graphics.lineTo(50+45*Math.cos(t/300), 50+45*Math.sin(t/300));
       bitmap.bitmapData.draw(shape);
+    }
+
+    private function spawnJPEGChild(bytes:ByteArray):void
+    {
+      var loader:Loader = new Loader();
+      loader.loadBytes(bytes);
+      tweenData[loader] = { dx:Math.random()*.2-.1, dy:Math.random()*.2-.1, drotation:Math.random()*.1-0.05, dscale:1+Math.random()*0.0004-0.0003 };
+      loader.x = 200;
+      loader.y = 200;
+      container.addChild(loader);
+
+      setTimeout(function():void {
+        delete tweenData[loader];
+        container.removeChild(loader);
+      }, 3000);
     }
 
     private function tryNativeEncode(canvas:BitmapData):ByteArray
