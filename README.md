@@ -4,7 +4,7 @@ AS3-Worker-Compat
 ActionScript Worker wrapper for compatibility with all AS3 versions of the
 Flash Player (9 and later)
 
-<b>NEW:</b> v0.2 includes basic cross-thread data sharing support!
+<b>NEW:</b> v0.2.1 includes AsyncScheduler and JPEGEncoder demo
 
 About
 =====
@@ -17,6 +17,9 @@ API is available and supported.  This allows SWFs compiled with this code to be
 playable on all version of the Flash Player, not just those with Worker support
 (11.4 and later).
 
+As such, it also allows you to use an older compiler (Flash CS6, older version
+of Flash Builder or Flex, etc) to take advantage of Workers.
+
 Features
 ========
 
@@ -24,17 +27,28 @@ Features
   * WorkerCompat - backward-compatible Worker wrapper
 * v0.2
   * XTSharedObject - dead-simple cross-thread data sharing
+* v0.2.1
+  * AsyncSchedule - asynchronous scheduler utility
+  * JPEGEncoder - Adobe lib with new pseudo-threaded encodeAsync() method
+  * JPEGEncoderTest - Demo showing the use of JPEGEncoder
 
 See <a href="https://github.com/jcward/AS3-Worker-Compat/edit/master/README.md#feature-details">Feature Details</a> below for more info.
 
-Demo
-====
+Demos
+=====
+
+The demos showcase various aspects of the AS3-Worker-Compat library.  All will run
+in all versions of the Flash Player, and run via the use of Workers when supported,
+falling back to pseudo-thread techniques when not.
+
+WorkerCompatTest
+----------------
 
 The WorkerCompatTest demo shows a red "radar-like" graphic that is generated on-the-fly,
 while also running a CPU-burning while loop.  This demo SWF works in all Flash
 Player versions.
 
-<a href="http://lilcodemonkey.com/github/WorkerCompatTest_v0.2/WorkerCompatTest.swf">Try it now in your browser</a>.
+<a href="http://jcward.com/github/WorkerCompatTest_v0.2.1/WorkerCompatTest.swf">Try it now in your browser</a>.
 
 If AS3 Workers are supported, the two tasks are run on separate threads
 and the graphic is a smooth fading radar.
@@ -48,7 +62,24 @@ as possible even without Workers.
 Here's a screenshot of the demo in two browsers, one supporting Workers and
 the other not.
 
-<img src="http://lilcodemonkey.com/github/AS3-Worker-Compat/demo_output.png"/>
+<img width="400" src="http://jcward.com/github/WorkerCompatTest_v0.2.1/screenshot.png"/>
+
+JPEGEncoderTest
+---------------
+
+The JPEGEncoderTest demo compares various JPEG encoding schemas:
+* synchronous native encoding (when supported, FP 11.3+)
+* synchronous encoding
+* asynchronous encoding utilizing the AsyncScheduler class
+  * Using AsyncScheduler.LOW, MEDIUM, and HIGH priorities
+
+<a href="http://jcward.com/github/JPEGEncoderTest_v0.2.1/JPEGEncoderTest.swf">Try it now in your browser</a>.
+
+Here's a screenshot of the demo in two browsers, one supporting Workers and
+the other not.  Noteice that with Worker support, asynchronous JPEG encoding
+does not reduce UI framerates.
+
+<img width="400" src="http://jcward.com/github/JPEGEncoderTest_v0.2.1/screenshot.jpg"/>
 
 Feature Details
 ===============
@@ -68,6 +99,27 @@ Also, be aware when using dynamic/runtime class lookup, you don't get
 compile-time type checking on those classes (Worker, WorkerDomain, etc).
 However, when building the demos, I found that I didn't use those classes
 at all but to instantiate my worker.  After that, it's all application logic.
+
+What's New in v0.2.1
+--------------------
+
+This release brings a utility, AsyncScheduler, that makes converting synchronous, loop-based
+algorithms (like JPEG encoding) into asynchronous, pseudo-threadable
+algorithms easy.  Pseudo-threads are a must if you're going to support older,
+non-threading Flash Players, but it's not a bad idea to write asynchronous
+code even when utilizing Workers.  It allows a single background thread to
+service many tasks simultaneously.
+
+Consequently, a new demo, JPEGEncoderTest, is new in v0.2.1 showcasing this
+new functionality.  The standard JPEGEncoder library by Adobe was ported to
+asynchronous code using the AsyncScheduler.async helper function.
+
+In WorkerCompatTest I also updated the code to better reflect that doGuiWork
+should be responsible for setting up the stage (not necessarily the constructor,
+since that's shared with the background worker).
+
+Oh, I also changed the library namespace from com.lilcodemonkey to com.jcward -
+hope that didn't perturb anyone.  :)
 
 What's New in v0.2
 ------------------
@@ -105,8 +157,7 @@ runtime-error in Flash Players earlier than 11.4, something like:
 Usage / Conversion
 ==================
 
-If you're familiar with AS3 Workers, then using WorkerCompat is as simple as changing
-this code:
+Using WorkerCompat is as simple as changing these hard-coded worker references:
 
 <pre>
   import flash.system.Worker;
@@ -119,10 +170,10 @@ this code:
   }
 </pre>
 
-To this code:
+To this:
 
 <pre>
-  import com.lilcodemonkey.WorkerCompat;
+  import com.jcward.WorkerCompat;
 
   ...
 

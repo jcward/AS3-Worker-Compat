@@ -1,4 +1,4 @@
-package com.lilcodemonkey.workers {
+package com.jcward.workers {
 
   import flash.utils.Proxy;
   import flash.utils.flash_proxy;
@@ -13,10 +13,6 @@ package com.lilcodemonkey.workers {
    * Object.
    *
    * There are a few things to keep in mind when using this class:
-   *
-   *  - Each worker must be attached to the XTSharedObject class via:
-   *      XTSharedObject.attachWorker(worker);
-   *    before calling worker.start();
    *
    *  - A background worker could potentially saturate this shared object
    *    by writing too often (i.e. in a loop) and it can crash Flash.  Plan
@@ -48,13 +44,6 @@ package com.lilcodemonkey.workers {
     private static var _cachedWorkersSupported:Boolean;
     private static var _cachedIsPrimordial:Boolean;
 
-    public static function attachWorker(worker:*):void
-    {
-      if (_cachedWorkersSupported && _cachedIsPrimordial) {
-        worker.setSharedProperty("_XTSOPrimordial", WorkerCompat.Worker.current);
-      }
-    }
-
     public function XTSharedObject():void
     {
       _cachedWorkersSupported = WorkerCompat.workersSupported;
@@ -63,24 +52,15 @@ package com.lilcodemonkey.workers {
         _cachedIsPrimordial = WorkerCompat.Worker.current.isPrimordial as Boolean;
         if (_cachedIsPrimordial) {
           _primordial = WorkerCompat.Worker.current;
-          trace("Setting _primordial with self");
         } else {
-          // This should work, but doesn't...  It finds the _primordial ref
-          // but communication via get/set doesn't work.
-          //var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
-          //for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
-          //  trace("Checking worker "+i);
-          //  if (!vectorOfWorkers[i].isPrimordial) {
-          //    trace("Setting _primordial with worker "+i);
-          //    _primordial = vectorOfWorkers[i];
-          //    //break;
-          //  }
-          //}
-
-          // Instead we must pass in a reference manually.  =P
-          _primordial = WorkerCompat.Worker.current.getSharedProperty("_XTSOPrimordial");
+          var vectorOfWorkers:* = WorkerCompat.WorkerDomain.current.listWorkers();
+          for (var i:int = vectorOfWorkers.length-1; i>=0; i--) {
+            if (vectorOfWorkers[i].isPrimordial) {
+              _primordial = vectorOfWorkers[i];
+              break;
+            }
+          }
         }
-        trace("_primordial is: "+_primordial);
       } else {
         if (_primordial==null) {
           _primordial = new Object();
@@ -91,7 +71,11 @@ package com.lilcodemonkey.workers {
     override flash_proxy function getProperty(name:*):*
     {
       if (_cachedWorkersSupported) {
-        return _primordial.getSharedProperty(name);
+        try {
+          return _primordial.getSharedProperty(name);
+        } catch (e:Error) {
+          return null;
+        }
       } else {
         return _primordial[name];
       }

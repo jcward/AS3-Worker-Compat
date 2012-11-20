@@ -13,8 +13,8 @@ package
   import flash.utils.setInterval;
   import flash.utils.setTimeout;
 
-  import com.lilcodemonkey.workers.WorkerCompat;
-  import com.lilcodemonkey.workers.XTSharedObject;
+  import com.jcward.workers.WorkerCompat;
+  import com.jcward.workers.XTSharedObject;
 
   /**
    * This test showcases the backward-compatible use of AS3 Workers.  It runs
@@ -32,27 +32,25 @@ package
     private var shape:Shape;
     private var bitmap:Bitmap;
     private var count:TextField;
-    public static var text:TextField;
 
     private var xtSharedObject:Object;
 
     // Constructor
     public function WorkerCompatTest():void
     {
-      if (stage) {
-        stage.align = 'topLeft';
-        stage.scaleMode ='noScale';
-        stage.frameRate = 60;
-      }
-
       // Get a reference to the cross-thread shared object
       xtSharedObject = new XTSharedObject();
 
-      showInfo();
-
       if (WorkerCompat.workersSupported) {
         // Setup threading
-        setupThreads();
+        if (WorkerCompat.Worker.current.isPrimordial) { // Main thread runs this
+          doGuiWork();
+          // Creates a duplicate of this worker to run as the background worker
+          var bgWorker:* = WorkerCompat.WorkerDomain.current.createWorker(this.loaderInfo.bytes);
+          bgWorker.start();
+        } else { // Background thread runs this
+          doBackgroundWork();
+        }
       } else {
         // Fallback: Do all the work in this thread
         doGuiWork();
@@ -69,10 +67,10 @@ package
         userAgent = "unknown";
       }
 
-      text = new TextField();
+      var text:TextField = new TextField();
       text.width = text.height = 500;
       text.x = 105;
-      text.text = "WorkerCompatTest v0.2\n"+
+      text.text = "WorkerCompatTest v0.2.1\n"+
                   "Flash Player version: " + Capabilities.version+"\n"+
                   "userAgent: "+userAgent+"\n"+
                   "Worker Class (11.4+): "+WorkerCompat.Worker+"\n"+
@@ -81,21 +79,13 @@ package
       addChild(text);
     }
 
-    private function setupThreads():void
-    {
-      if (WorkerCompat.Worker.current.isPrimordial) { // Main thread runs this
-        doGuiWork();
-        // Creates a duplicate of this worker to run as the background worker
-        var bgWorker:* = WorkerCompat.WorkerDomain.current.createWorker(this.loaderInfo.bytes);
-        XTSharedObject.attachWorker(bgWorker);
-        bgWorker.start();
-      } else { // Background thread runs this
-        doBackgroundWork();
-      }
-    }
-
     private function doGuiWork():void
     {
+      stage.align = 'topLeft';
+      stage.scaleMode ='noScale';
+      stage.frameRate = 60;
+      showInfo();
+
       shape = new Shape();
       bitmap = new Bitmap(new BitmapData(100, 100, false, 0x0));
       addChild(bitmap);
@@ -128,11 +118,6 @@ package
           dt = getTimer()-t0;
         }
       }, 400);
-
-      // Every 16ms, update shared tick value
-      setInterval(function():void {
-      }, 16);
-
     }
 
     private function onFrame(e:Event):void
@@ -141,7 +126,7 @@ package
 
       var tick:int = xtSharedObject.tick;
       count.text = 'Background worker count = '+tick+
-        ', ~'+(Math.floor(10*(tick/getTimer()))/10)+' Kps';
+        ', ~'+(Math.floor(10*(tick/t))/10)+' Kps';
 
       // Fade to black
       shape.graphics.clear();
@@ -156,8 +141,6 @@ package
       shape.graphics.moveTo(50, 50);
       shape.graphics.lineTo(50+45*Math.cos(t/300), 50+45*Math.sin(t/300));
       bitmap.bitmapData.draw(shape);
-
-      
     }
   }
 }
