@@ -18,7 +18,7 @@ package
    */
   public class SwarmTestSBA extends Sprite
   {
-    private const NUM:int = 1000;
+    private const NUM:int = 800;
     private var shape:Shape;
 
     private var xtSharedObject:Object;
@@ -54,13 +54,12 @@ package
       stage.scaleMode ='noScale';
       stage.frameRate = 60;
 
-      xtSharedObject.num = NUM;
       xtSharedObject.stageWidth = stage.stageWidth;
       xtSharedObject.stageHeight = stage.stageHeight;
 
       var t:TextField = new TextField();
       t.width = 400;
-      t.text = "Workers? "+WorkerCompat.workersSupported;
+      t.text = "Workers? "+WorkerCompat.workersSupported+", shareable? "+WorkerCompat.shareableByteArraySupported;
       addChild(t);
 
       shape = new Shape();
@@ -71,9 +70,10 @@ package
     private function doBackgroundWork():void
     {
       xx = new ByteArray();
-      WorkerCompat.setShareable(xx);
       yy = new ByteArray();
-      WorkerCompat.setShareable(yy);
+
+      WorkerCompat.setShareable(xx, false);
+      WorkerCompat.setShareable(yy, false);
 
       xtSharedObject.x = xx;
       xtSharedObject.y = yy;
@@ -83,14 +83,17 @@ package
 
       // Setup swarm
       var i:int;
-      for (i = xtSharedObject.num-1; i>=0; i--) {
+      xx.position = yy.position = 0;
+      for (i=0; i<NUM; i++) {
         xx.writeDouble(Math.random()*sw);
         yy.writeDouble(Math.random()*sh);
       }
 
-      // // Assign-back
-      // xtSharedObject.x = xx;
-      // xtSharedObject.y = yy;
+      // Assign-back
+      if (!WorkerCompat.shareableByteArraySupported) {
+        xtSharedObject.x = xx;
+        xtSharedObject.y = yy;
+      }
 
       if (WorkerCompat.workersSupported) {
         // Use the background thread heavily
@@ -101,13 +104,13 @@ package
       }
 
       // Asynchronous movement calculation
-      i = xtSharedObject.num-1;
-      var j:int = xtSharedObject.num-1;
+      i = 0;
+      var j:int = 0;
       var forceX:Number;
       var forceY:Number;
       AsyncScheduler.async(this,
         function(timeout:int):Boolean {
-          for (; i>=0; i--) { if (getTimer()>timeout) { return false; }
+          for (; i<NUM; i++) { if (getTimer()>timeout) { return false; }
             forceX = forceY = 0;
             xx.position = yy.position = i*8;
             var ix:Number = xx.readDouble();
@@ -117,7 +120,7 @@ package
             var dist:Number;
             var angle:Number;
 
-            for (; j>=0; j--) { if (getTimer()>timeout) { return false; }
+            for (; j<NUM; j++) { if (getTimer()>timeout) { return false; }
               if (j==i) continue;
 
               xx.position = yy.position = j*8;
@@ -134,7 +137,7 @@ package
                 forceY += 5*Math.sin(angle)/(5+dist);
               }
             }
-            j = xtSharedObject.num-1; // reset loop
+            j = 0; // reset loop
 
             // attraction to center
             jx = sw/2;
@@ -153,15 +156,17 @@ package
             ix += forceX;
             iy += forceY;
             xx.position = yy.position = i*8;
-            xx.writeDouble(forceX);
-            yy.writeDouble(forceY);
+            xx.writeDouble(ix);
+            yy.writeDouble(iy);
 
           }
-          i = xtSharedObject.num-1; // reset loop
+          i = 0; // reset loop
 
-          // // Assign-back
-          // xtSharedObject.x = xx;
-          // xtSharedObject.y = yy;
+          // Assign-back
+          if (!WorkerCompat.shareableByteArraySupported) {
+            xtSharedObject.x = xx;
+            xtSharedObject.y = yy;
+          }
 
           return false; // this task is indefinite
       });
@@ -172,10 +177,11 @@ package
       var x:ByteArray = xtSharedObject.x;
       var y:ByteArray = xtSharedObject.y;
 
-      if (x && y) {
+      if (x && y && x.length==NUM*8 && y.length==NUM*8) {
         shape.graphics.clear();
         shape.graphics.beginFill(0xff0000);
-        for (var i:int=xtSharedObject.num-1; i>=0; i--) {
+        x.position = y.position = 0;
+        for (var i:int=NUM-1; i>=0; i--) {
           shape.graphics.drawCircle(x.readDouble(), y.readDouble(), 3);
         }
       }

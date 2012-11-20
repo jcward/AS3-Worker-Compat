@@ -67,6 +67,19 @@ package com.jcward.workers {
     }
 
     /**
+     * Returns true iff Flash Player >= 11.4 and Worker.isSupported is true
+     *
+     * Will return false for Flash Player < 11.4
+     * Note: Also returns false for Chrome/Windows PPAPI 11.4
+     *       (Workers disabled by Google)
+     */
+    public static function get shareableByteArraySupported():Boolean
+    {
+      if (!_cachePrimed) primeCache();
+      return _cached11dot5;
+    }
+
+    /**
      * Accessor for Worker class
      *
      * Will return null for Flash Player < 11.4
