@@ -4,7 +4,7 @@ AS3-Worker-Compat
 ActionScript Worker wrapper for compatibility with all AS3 versions of the
 Flash Player (9 and later)
 
-<b>NEW:</b> v0.2 includes basic cross-thread data sharing support!
+<b>NEW:</b> v0.2.1 includes AsyncScheduler and JPEGEncoder demo
 
 About
 =====
@@ -16,6 +16,9 @@ The WorkerCompat wrapper simply uses dynamic-lookup to determine if the Worker
 API is available and supported.  This allows SWFs compiled with this code to be
 playable on all version of the Flash Player, not just those with Worker support
 (11.4 and later).
+
+As such, it also allows you to use an older compiler (Flash CS6, older version
+of Flash Builder or Flex, etc) to take advantage of Workers.
 
 Features
 ========
@@ -45,7 +48,7 @@ The WorkerCompatTest demo shows a red "radar-like" graphic that is generated on-
 while also running a CPU-burning while loop.  This demo SWF works in all Flash
 Player versions.
 
-<a href="http://jcward.com/github/WorkerCompatTest_v0.2/WorkerCompatTest.swf">Try it now in your browser</a>.
+<a href="http://jcward.com/github/WorkerCompatTest_v0.2.1/WorkerCompatTest.swf">Try it now in your browser</a>.
 
 If AS3 Workers are supported, the two tasks are run on separate threads
 and the graphic is a smooth fading radar.
@@ -59,7 +62,7 @@ as possible even without Workers.
 Here's a screenshot of the demo in two browsers, one supporting Workers and
 the other not.
 
-<img src="http://jcward.com/github/AS3-Worker-Compat/demo_output.png"/>
+<img src="http://jcward.com/github/WorkerCompatTest_v0.2.1/screenshot.png"/>
 
 JPEGEncoderTest
 ---------------
@@ -71,6 +74,12 @@ The JPEGEncoderTest demo compares various JPEG encoding schemas:
   * Using AsyncScheduler.LOW, MEDIUM, and HIGH priorities
 
 <a href="http://jcward.com/github/JPEGEncoderTest_v0.2.1/JPEGEncoderTest.swf">Try it now in your browser</a>.
+
+Here's a screenshot of the demo in two browsers, one supporting Workers and
+the other not.  Noteice that with Worker support, asynchronous JPEG encoding
+does not reduce UI framerates.
+
+<img width="100%" src="http://jcward.com/github/JPEGEncoderTest_v0.2.1/screenshot.jpg"/>
 
 Feature Details
 ===============
