@@ -29,13 +29,11 @@
   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-package
+package com.jcward.workers
 {
   import flash.geom.*;
   import flash.display.*;
   import flash.utils.*;
-
-  import com.jcward.workers.AsyncScheduler;
 
   /**
    * Class that converts BitmapData into a valid JPEG
@@ -45,8 +43,9 @@ package
 
     /**
      * Create a JPEG image from the specified BitmapData asynchronously,
-     * utilizing the AsyncScheduler.loop pseudo-threading helper class.
-     * Compare to the synchronous/blocking encode() below.
+     * utilizing the AsyncScheduler.async pseudo-threading helper class.
+     * Compare to the synchronous/blocking encode() and new encode_native()
+     * methods below.
      *
      * @param image The BitmapData that will be converted into the JPEG format.
      * @param callback A function called with the JPEG ByteArray on completion.
@@ -56,14 +55,16 @@ package
      * @playerversion Flash 9.0
      * @tiptext
      */
-    public function encode_async(image:BitmapData,
-                                 callback:Function,
-                                 outputByteArray:ByteArray=null):void
+    public function encodeAsync(image:BitmapData,
+                                callback:Function,
+                                outputByteArray:ByteArray=null):void
     {
-      // Each JPEGEncoder instance can only handle 1 encoding job at a time
-      if (byteout) {
+      // Each JPEGEncoder instance can only handle 1 asynchronous encoding
+      // job at a time
+      if (asyncOutstanding) {
         throw new Error("Create a separate JPEGEncoder for multiple jobs");
       }
+      asyncOutstanding = true;
 
       // Initialize bit writer
       byteout = outputByteArray ? outputByteArray : new ByteArray();
@@ -92,10 +93,10 @@ package
       var xpos:int = 0;
       var ypos:int = 0;
 
-      // Be aware that, in an asynchronousLoop:
-      //  - time can pass in-between iterations, and hence
+      // Be aware that, in an .async callback:
+      //  - time can pass in-between calls / iterations, and hence
       //    external state can possibly change
-      //  - the iteration function will always be invoked from the
+      //  - the callback function will always be invoked from the
       //    top, hence initialization code must live outside
       //    the loop, or you will loop infinitely:  i.e. use for(;
       //  - the loop must exit if:
@@ -104,12 +105,11 @@ package
       //       loop iteration
       //    - it finishes, returning true to indicate it is completed
       //  - nothing involved in the loop logic should be called
-      //    after asynchronousLoop()
-      //  - asynchronousLoop is a way to implement pseudo-threading;
-      //    it dosen't care if it's executed on a background or
-      //    primordial Worker
-      AsyncScheduler.loop(this,
-                          function(timeout:int):Boolean
+      //    after .async()
+      //  - .async() is a way to implement pseudo-threading; it doesn't
+      //    matter if it's executed on a background or primordial Worker
+      AsyncScheduler.async(this,
+                           function(timeout:int):Boolean
       {
         // Encode 8x8 macroblocks
         for (; ypos<image.height; ypos+=8) {
@@ -136,14 +136,17 @@ package
 
         writeWord(0xFFD9); //EOI
         callback(byteout);
-        byteout = null;
 
+        asyncOutstanding = false;
         return true;
-      }); // No more code after the AsyncScheduler.loop function call
+      }); // No more code after the AsyncScheduler.async function call
     }
 
     /**
-     * Created a JPEG image from the specified BitmapData
+     * Create a JPEG image from the specified BitmapData synchronously
+     * using Flash's native BitmapData.encode().  As with all AS3-Worker-
+     * Compat functionality, this function falls back to software encoding
+     * if the API doesn't exist (Flash Player 11.3 and later)
      *
      * @param image The BitmapData that will be converted into the JPEG format.
      * @return a ByteArray representing the JPEG encoded image data.
@@ -152,6 +155,42 @@ package
      * @tiptext
      */
     public function encode(image:BitmapData):ByteArray
+    {
+      try {
+        byteout = new ByteArray();
+        var JPEGEncoderOptionsClass:* = getDefinitionByName("flash.display.JPEGEncoderOptions");
+        Object(image).encode(image.rect, new JPEGEncoderOptionsClass(quality), byteout);
+        return byteout;
+      } catch (e:Error) { }
+
+      // Non-native fallback fallback
+      return encodeNonNative(image);
+    }
+
+    /**
+     * Returns true if native JPEG encoding is supported (i.e.
+     * Flash Player 11.3+)
+     */
+    public static function get supportsNativeEncode():Boolean
+    {
+      try {
+        var JPEGEncoderOptionsClass:* = getDefinitionByName("flash.display.JPEGEncoderOptions");
+        return true;
+      } catch (e:Error) { }
+      return false;
+    }
+
+    /**
+     * Create a JPEG image from the specified BitmapData.  This is the
+     * original encoding function provided by Adobe.
+     *
+     * @param image The BitmapData that will be converted into the JPEG format.
+     * @return a ByteArray representing the JPEG encoded image data.
+     * @langversion ActionScript 3.0
+     * @playerversion Flash 9.0
+     * @tiptext
+     */
+    public function encodeNonNative(image:BitmapData):ByteArray
     {
       // Initialize bit writer
       byteout = new ByteArray();
@@ -205,6 +244,8 @@ package
       35,36,48,49,57,58,62,63
     ];
 
+    private var quality:Number;
+    private var asyncOutstanding:Boolean = false;
     protected var YTable:Array = new Array(64);
     protected var UVTable:Array = new Array(64);
     protected var fdtbl_Y:Array = new Array(64);
@@ -732,6 +773,8 @@ package
       if (quality > 100) {
         quality = 100;
       }
+      this.quality = quality;
+
       var sf:int = 0;
       if (quality < 50) {
         sf = int(5000 / quality);

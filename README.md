@@ -24,11 +24,22 @@ Features
   * WorkerCompat - backward-compatible Worker wrapper
 * v0.2
   * XTSharedObject - dead-simple cross-thread data sharing
+* v0.2.1
+  * AsyncSchedule - pseudo-threading scheduler utility
+  * JPEGEncoder - Adobe lib with new pseudo-threaded encodeAsync() method
+  * JPEGEncoderTest - Demo showing the use of JPEGEncoder
 
 See <a href="https://github.com/jcward/AS3-Worker-Compat/edit/master/README.md#feature-details">Feature Details</a> below for more info.
 
 Demo
 ====
+
+The demos showcase various aspects of the AS3-Worker-Compat library.  All will run
+in all versions of the Flash Player, and typically work via the use of Workers when
+supported, faling back to pseudo-threads when not.
+
+WorkerCompatTest
+----------------
 
 The WorkerCompatTest demo shows a red "radar-like" graphic that is generated on-the-fly,
 while also running a CPU-burning while loop.  This demo SWF works in all Flash
@@ -50,6 +61,17 @@ the other not.
 
 <img src="http://jcward.com/github/AS3-Worker-Compat/demo_output.png"/>
 
+JPEGEncoderTest
+---------------
+
+The JPEGEncoderTest demo compares various JPEG encoding schemas:
+* synchronous native encoding (when supported, FP 11.3+)
+* synchronous encoding
+* asynchronous encoding utilizing the AsyncScheduler class
+  * Using AsyncScheduler.LOW, MEDIUM, and HIGH priorities
+
+<a href="http://jcward.com/github/JPEGEncoderTest_v0.2.1/JPEGEncoderTest.swf">Try it now in your browser</a>.
+
 Feature Details
 ===============
 
@@ -68,6 +90,27 @@ Also, be aware when using dynamic/runtime class lookup, you don't get
 compile-time type checking on those classes (Worker, WorkerDomain, etc).
 However, when building the demos, I found that I didn't use those classes
 at all but to instantiate my worker.  After that, it's all application logic.
+
+What's New in v0.2.1
+--------------------
+
+This release brings a utility, AsyncScheduler, that makes converting synchronous, loop-based
+algorithms (like JPEG encoding) into asynchronous, pseudo-threadable
+algorithms easy.  Pseudo-threads are a must if you're going to support older,
+non-threading Flash Players, but it's not a bad idea to write asynchronous
+code even when utilizing Workers.  It allows a single background thread to
+service many tasks simultaneously.
+
+Consequently, a new demo, JPEGEncoderTest, is new in v0.2.1 showcasing this
+new functionality.  The standard JPEGEncoder library by Adobe was ported to
+asynchronous code using the AsyncScheduler.async helper function.
+
+In WorkerCompatTest I also updated the code to better reflect that doGuiWork
+should be responsible for setting up the stage (not necessarily the constructor,
+since that's shared with the background worker).
+
+Oh, I also changed the library namespace from com.lilcodemonkey to com.jcward -
+hope that didn't perturb anyone.  :)
 
 What's New in v0.2
 ------------------

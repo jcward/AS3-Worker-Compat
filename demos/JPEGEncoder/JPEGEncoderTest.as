@@ -19,29 +19,28 @@ package
   import com.jcward.workers.WorkerCompat;
   import com.jcward.workers.XTSharedObject;
   import com.jcward.workers.AsyncScheduler;
+  import com.jcward.workers.JPEGEncoder;
 
   /**
    * This test uses the AS3-Worker-Compat library to encode JPEGs in an
-   * asynchronous manner.  The JPEGEncoder.as class is the standard Adobe
-   * library but an added encode_async() method (compare it to the standard
-   * encode method.)  It uses AsyncScheduler to break the algorithm into
-   * a pseudo-threaded one, which is necessary for single-threaded scenarios,
-   * but helpful in multi-threaded players also (synchronous encoding would
-   * block the background thread, possibly delaying other jobs that thread
-   * is responsible for.)  While asynchronous/scheduled computation is
-   * slightly less efficient than synchronous, uninterrupted operation, it
-   * allows a thread/Worker to be shared between tasks.
+   * asynchronous manner, compare performance with synchronous methods, and
+   * highlight smooth UI while using background Workers (though via the use of
+   * the pseudo-threaded algorithm, retains a functional if choppy UI in
+   * Flash Players without Worker support.)
    *
-   * Note that the AsyncScheduler is tunable - you can direct how much time
-   * it computes each pass, and how much time between passes - and jobs can
-   * be submitted with varying priorities (since jobs will compete for CPU
-   * time).  Naturally this affects its efficiency of computation compared
-   * to synchronous computation, and on a background thread there's no need
-   * for time between passes since it doesn't have to render the UI.
+   * The JPEGEncoder.as class is the standard Adobe library but with
+   * modifications:
+   *  - added encodeAsync() method which uses AsyncScheduler.async pseudo-
+   *    threading (compare it to the standard, synchronous encode method.)
+   *  - changed encode() method to use Flash native JPEg encoding by default
+   *    with fallbacks to the software encoder for older Flash Players
    *
-   * Also note that while the AsyncScheduler class is static, it is not
-   * shared among threads.  There exists a separate instance of it in each
-   * Worker thread.
+   * Note that pseudo-threading algorithms isn't a bad idea even for background
+   * threads.  By pseudo-threading on a background thread and using
+   * AsyncScheduler to manager those tasks, one background Worker can service
+   * many tasks simultaneously.
+   *
+   * See AsyncScheduler and JPEGEncoder for more details.
    */
   public class JPEGEncoderTest extends Sprite
   {
@@ -90,28 +89,25 @@ package
       text.width = text.height = 800;
       text.x = 105;
       header =
-        "asdf JPEGEncoderTest, AS3-Worker-Compat v0.2.1\n"+
+        "JPEGEncoderTest, AS3-Worker-Compat v0.2.1\n"+
         "Flash Player version: " + Capabilities.version+
         ", workersSupported: "+WorkerCompat.workersSupported+
         ", shareableByteArray support: "+(WorkerCompat.Mutex!=null)+"\n"+
         "------------------------------------------------------------"+
         "------------------------------------------------------------";
-      log = [];
-      text.text = header + "\nTesting synchronous encoding...";
+      log = ["Testing encoding on a 512x512 bitmap..."];
+      text.text = header+"\n"+log.join("\n");
       addChild(text);
     }
 
-    private function appendLog(msg:String):void
+    private function appendLog(msg:Object):void
     {
-      log.push(msg);
-      if (log.length>4) log.shift();
+      if (msg is String) { log.push(msg); }
+      if (msg is Array) { while (msg.length>0) { log.push(msg.shift()); } }
 
-      text.text = header+"\n"+
-        (xtSharedObject.msg1 || "--")+"\n"+
-        (xtSharedObject.msg2 || "--")+"\n"+
-        "------------------------------------------------------------"+
-        "------------------------------------------------------------\n"+
-        log.join("\n");
+      //while (log.length>4) log.shift();
+
+      text.text = header+"\n"+log.join("\n");
     }
 
     private function doGuiWork():void
@@ -120,6 +116,12 @@ package
       stage.align = 'topLeft';
       stage.scaleMode ='noScale';
       stage.frameRate = 60;
+
+      xtSharedObject.frameCount = 0;
+
+      container = new Sprite();
+      addChild(container);
+
       showInfo();
 
       tweenData = new Dictionary();
@@ -134,61 +136,105 @@ package
       bitmap = new Bitmap(new BitmapData(100, 100, false, 0x0));
       addChild(bitmap);
 
-      container = new Sprite();
-      addChild(container);
-
       this.addEventListener(Event.ENTER_FRAME, onFrame);
     }
 
     private function doBackgroundWork():void
     {
-      synchronousEncodingTest();
-      xtSharedObject.msg = "BKG: Synchronous tests complete, starting asynchronous encoding";
-      asynchronousEncodingTest();
+      compareEncoders();
     }
 
-    private function synchronousEncodingTest():void
+    /**
+     * Measure the performance of JPEG encoding using:
+     *  - Flash Player native encoding (11.3+)
+     *  - Software encoding
+     *  - Pseudo-threaded software encoding using AsyncScheduler LOW,
+     *    MEDIUM, and HIGH profiles
+     */
+    private function compareEncoders():void
     {
       var canvas:BitmapData = getRandomBitmapData();
-      var ba:ByteArray;
+
+      var msgs:Array = [];
 
       // Test synchronous encoding with native JPEG encoding BitmapData.encode
       var t0:uint = getTimer();
-      ba = tryNativeEncode(canvas);
-      if (ba) {
-        xtSharedObject.msg1 = "BKG: JPEG generated snychronously using native encoder: "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
+      var encoderSync:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
+      var bytes:ByteArray;
+      if (JPEGEncoder.supportsNativeEncode) {
+        bytes = encoderSync.encode(canvas);
+        msgs.push("BKG: JPEG sync, native encoder: "+bytes.length+" bytes in "+(getTimer()-t0)+" ms");
       } else {
-        xtSharedObject.msg1 = "BKG: can't test synchronous native JPEG encoder (FP < 11.3)";
+        msgs.push("BKG: native JPEG encoder not supported (FP < 11.3)");
       }
 
-      // Test synchronous encoding
+      // Test synchronous, non-native encoding
       t0 = getTimer();
-      var j_sync:JPEGEncoder = new JPEGEncoder();
-      ba = j_sync.encode(canvas);
-      xtSharedObject.msg2 = "BKG: JPEG generated snychronously using JPEGEncoder: "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
+      bytes = encoderSync.encodeNonNative(canvas);
+      msgs.push("BKG: JPEG sync JPEGEncoder: "+bytes.length+" bytes in "+(getTimer()-t0)+" ms");
+      xtSharedObject.msg = msgs;
+
+      asyncTestProfiles(canvas, [AsyncScheduler.LOW, AsyncScheduler.MEDIUM, AsyncScheduler.HIGH]);
     }
 
-    private function asynchronousEncodingTest():void
+    /**
+     * Test the various profiles of AsyncScheduler so-as to compare
+     * asynchronous performance of JPEG encoding against synchronous
+     * encoding above
+     */
+    private function asyncTestProfiles(canvas:BitmapData, profiles:Array):void
     {
-      var canvas:BitmapData = getRandomBitmapData(256, 256);
-
-      // Test asynchronous encoding with moderate AsyncScheduler parameters
-      //  - if workers are not supported, this will stutter the UI somewhat
-      //  - if workers are supported, this shouldn't affect performance at all
-      AsyncScheduler.setParams(150, 15);
+      var profile:String = profiles.shift();
+      AsyncScheduler.setParams(profile);
       var t0:uint = getTimer();
-      var j:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
+      var encoderAsync:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
 
-      j.encode_async(canvas, function(ba:ByteArray):void {
-        xtSharedObject.msg = "BKG: JPEG generated asynchronously using JPEGEncoder: "+ba.length+" bytes in "+(getTimer()-t0)+" ms";
-        xtSharedObject.imageData = ba;
+      // Reset frame counter
+      xtSharedObject.frameCount = 0;
+      encoderAsync.encodeAsync(canvas, function(bytes:ByteArray):void {
+        var ms:uint = getTimer()-t0;
+        var msg:String = "BKG: JPEG async, AsyncScheduler."+profile+": "+
+            bytes.length+" bytes in "+ms+" ms"+
+            ", average FPS="+(Math.floor(xtSharedObject.frameCount*10000/ms)/10);
+
+        if (profiles.length==0) {
+          xtSharedObject.msg = [msg, "Now running JPEG spawn test..."];
+          setTimeout(asyncSpawnJPEGs, 200);
+        } else {
+          xtSharedObject.msg = msg;
+          asyncTestProfiles(canvas, profiles);
+        }
+      });
+    }
+
+    /**
+     * Encode JPEGs on the background worker and pass them to the
+     * main worker for display/animation.
+     */
+    private function asyncSpawnJPEGs():void
+    {
+      var canvas:BitmapData = getRandomBitmapData(512, 512);
+
+      if (WorkerCompat.workersSupported) {
+        // Use the background thread heavily
+        AsyncScheduler.setParams(AsyncScheduler.HIGH);
+      } else {
+        // Stutter UI as little as possible without workers
+        AsyncScheduler.setParams(AsyncScheduler.LOW);
+      }
+
+      var t0:uint = getTimer();
+      var encoderAsync:JPEGEncoder = new JPEGEncoder(JPEG_QUALITY);
+
+      encoderAsync.encodeAsync(canvas, function(bytes:ByteArray):void {
+        xtSharedObject.imageData = bytes;
         xtSharedObject.imageDataValid = true;
 
-        setTimeout(asynchronousEncodingTest, 20);
+        setTimeout(asyncSpawnJPEGs, 20);
       }, xtSharedObject.imageData);
     }
 
-    private function getRandomBitmapData(width:int=1024,
+    private function getRandomBitmapData(width:int=512,
                                          height:int=512):BitmapData
     {
       // Generate BMP
@@ -210,12 +256,13 @@ package
       var t:Number = getTimer();
       var dt:Number = t - tLast;
       tLast = getTimer();
+      xtSharedObject.frameCount++;
 
       // Receieve new messages
-      var m:String = xtSharedObject.msg;
+      var m:Object = xtSharedObject.msg;
       if (m) {
-        appendLog(m);
         xtSharedObject.msg = null;
+        appendLog(m);
       }
 
       // Receieve new JPEG
@@ -228,13 +275,14 @@ package
 
       // Animate JPEGs
       for (var i:int=container.numChildren-1; i>=0; i--) {
-        var loader:DisplayObject = container.getChildAt(i);
+        var loader:Loader = container.getChildAt(i) as Loader;
         var tgt:Object = tweenData[loader];
         loader.x += dt*tgt.dx;
         loader.y += dt*tgt.dy;
         loader.rotation += dt*tgt.drotation;
-        //loader.scaleY = loader.scaleX *= tgt.dscale;
-      }
+        loader.scaleY += tgt.dscale;
+        loader.scaleX += tgt.dscale;
+     }
 
       // Animate spinner
       shape.graphics.clear();
@@ -253,9 +301,10 @@ package
     {
       var loader:Loader = new Loader();
       loader.loadBytes(bytes);
-      tweenData[loader] = { dx:Math.random()*.2-.1, dy:Math.random()*.2-.1, drotation:Math.random()*.1-0.05, dscale:1+Math.random()*0.0004-0.0003 };
-      loader.x = 200;
-      loader.y = 200;
+      tweenData[loader] = { dx:Math.random()*.2-.1, dy:Math.random()*.2, drotation:Math.random()*.04-0.02, dscale:Math.random()*0.004-0.003 };
+      loader.x = 300;
+      loader.y = 300;
+      loader.rotation = Math.random()*20-10;
       container.addChild(loader);
 
       setTimeout(function():void {
@@ -264,23 +313,12 @@ package
       }, 3000);
     }
 
-    private function tryNativeEncode(canvas:BitmapData):ByteArray
-    {
-      try {
-        var ba:ByteArray = new ByteArray();
-        var JPEGEncoderOptionsClass:* = getDefinitionByName("flash.display.JPEGEncoderOptions");
-        Object(canvas).encode(canvas.rect, new JPEGEncoderOptionsClass(JPEG_QUALITY), ba);
-        return ba;
-      } catch (e:Error) { }
-      return null;
-    }
-
     private static function cloneByteArray(input:ByteArray):ByteArray
     {
-      var ba:ByteArray = new ByteArray();
+      var bytes:ByteArray = new ByteArray();
       input.position = 0;
-      ba.writeBytes(input, 0, input.length);
-      return ba;
+      bytes.writeBytes(input, 0, input.length);
+      return bytes;
     }
 
   }
