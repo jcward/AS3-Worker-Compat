@@ -28,18 +28,18 @@ Features
 * v0.2
   * XTSharedObject - dead-simple cross-thread data sharing
 * v0.2.1
-  * AsyncSchedule - pseudo-threading scheduler utility
+  * AsyncSchedule - asynchronous scheduler utility
   * JPEGEncoder - Adobe lib with new pseudo-threaded encodeAsync() method
   * JPEGEncoderTest - Demo showing the use of JPEGEncoder
 
 See <a href="https://github.com/jcward/AS3-Worker-Compat/edit/master/README.md#feature-details">Feature Details</a> below for more info.
 
-Demo
-====
+Demos
+=====
 
 The demos showcase various aspects of the AS3-Worker-Compat library.  All will run
-in all versions of the Flash Player, and typically work via the use of Workers when
-supported, faling back to pseudo-threads when not.
+in all versions of the Flash Player, and run via the use of Workers when supported,
+falling back to pseudo-thread techniques when not.
 
 WorkerCompatTest
 ----------------
@@ -62,7 +62,7 @@ as possible even without Workers.
 Here's a screenshot of the demo in two browsers, one supporting Workers and
 the other not.
 
-<img src="http://jcward.com/github/WorkerCompatTest_v0.2.1/screenshot.png"/>
+<img width="400" src="http://jcward.com/github/WorkerCompatTest_v0.2.1/screenshot.png"/>
 
 JPEGEncoderTest
 ---------------
@@ -79,7 +79,7 @@ Here's a screenshot of the demo in two browsers, one supporting Workers and
 the other not.  Noteice that with Worker support, asynchronous JPEG encoding
 does not reduce UI framerates.
 
-<img width="100%" src="http://jcward.com/github/JPEGEncoderTest_v0.2.1/screenshot.jpg"/>
+<img width="400" src="http://jcward.com/github/JPEGEncoderTest_v0.2.1/screenshot.jpg"/>
 
 Feature Details
 ===============
@@ -157,8 +157,7 @@ runtime-error in Flash Players earlier than 11.4, something like:
 Usage / Conversion
 ==================
 
-If you're familiar with AS3 Workers, then using WorkerCompat is as simple as changing
-this code:
+Using WorkerCompat is as simple as changing these hard-coded worker references:
 
 <pre>
   import flash.system.Worker;
@@ -171,7 +170,7 @@ this code:
   }
 </pre>
 
-To this code:
+To this:
 
 <pre>
   import com.jcward.WorkerCompat;
