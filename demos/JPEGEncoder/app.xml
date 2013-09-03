@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<application xmlns="http://ns.adobe.com/air/application/3.9">
+	<id>com.jcward.AS3Workers.JPEGEncoder</id>
+	<filename>Worker Test</filename>
+	<name>Worker Test</name>
+	<versionNumber>0.0.1</versionNumber>
+
+	<initialWindow>
+		<content>JPEGEncoderTest.swf</content>
+		<width>800</width>
+		<height>600</height>
+    <renderMode>direct</renderMode>
+   	<autoOrients>false</autoOrients>
+    <fullScreen>false</fullScreen>
+    <aspectRatio>landscape</aspectRatio>
+    <visible>true</visible>
+  </initialWindow>
+</application>
