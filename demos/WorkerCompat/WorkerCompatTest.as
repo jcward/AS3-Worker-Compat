@@ -20,10 +20,6 @@ package
    * This test showcases the backward-compatible use of AS3 Workers.  It runs
    * in all versions of the Flash Player, and takes advantage of AS3 workers
    * whenever possible (Flash Player >= 11.4 && Worker.isSupported)
-   *
-   * A notable exception is Google Chrome under Windows (PPAPI)... for some
-   * reason Google has disabled workers in their bundled version of Flash 11.4
-   *
    * Very simple cross-thread data sharing (again, in any Flash Player) is
    * achieved via getting/setting values on xtSharedObject.
    */
