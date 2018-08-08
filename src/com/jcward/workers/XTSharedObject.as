@@ -18,25 +18,6 @@ package com.jcward.workers {
    *    by writing too often (i.e. in a loop) and it can crash Flash.  Plan
    *    your write/update frequency accordingly.
    *
-   *  - To ensure consistent behavior for all Flash Player versions, be
-   *    careful to only get/set AMF serializable objects on this object.
-   *    If you're unsure what this means, the short answer is: all simple
-   *    data types, and Objects and Arrays composed of simple data types
-   *    are OK.  References to instances (Sprite, MyClass, etc), are
-   *    typically NOT AMF serializable.
-   *
-   *  - Typically you should not use Objects and Arrays as properties,
-   *    because setting a property within those Objects does not trigger
-   *    the setter that writes the value to the other workers.  In other
-   *    words, a setter should only use one level of accessor:
-   *
-   *     xtso.value = 1;
-   *
-   *    And never sub-properties:
-   *
-   *     xtso.obj.value = 1; // This set won't get sent to other workers!
-   *
-   *    TODO: make this XTSO-class recursive?
    */
   dynamic public class XTSharedObject extends Proxy {
 
@@ -67,8 +48,30 @@ package com.jcward.workers {
         }
       }
     }
-
-    override flash_proxy function getProperty(name:*):*
+		private function setDirty(name:*):void{
+			if(_cachedWorkersSupported){
+				_primordial.setSharedProperty(name,this[name]);
+			}else{
+				_primordial[name] = this[name];
+			}
+		}
+		flash_proxy override function callProperty(name:*,...rest):*{
+			switch(String(name)){
+				case "setDirty":
+					setDirty(rest);
+				break;
+				default:
+			}
+		}
+		flash_proxy override function callProperty(name:*,...rest):*{
+			switch(String(name)){
+				case "setDirty":
+					setDirty(rest);
+				break;
+				default:
+			}
+		}
+    flash_proxy override function getProperty(name:*):*
     {
       if (_cachedWorkersSupported) {
         try {
@@ -81,7 +84,7 @@ package com.jcward.workers {
       }
     }
 
-    override flash_proxy function setProperty(name:*, value:*):void
+    flash_proxy function setProperty(name:*, value:*):void
     {
       if (_cachedWorkersSupported) {
         _primordial.setSharedProperty(name, value);
